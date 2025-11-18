@@ -34,9 +34,39 @@ Works in all modern browsers that support:
 - CSS Grid
 - Fetch API
 
+## Deployment
+
+### Deploy to Vercel (Recommended)
+
+1. Push your code to GitHub
+2. Go to [vercel.com](https://vercel.com) and sign in with GitHub
+3. Click "New Project"
+4. Import your repository
+5. Vercel will auto-detect it's a static site and deploy it
+6. Your site will be live in seconds!
+
+### Deploy to Netlify
+
+1. Push your code to GitHub
+2. Go to [netlify.com](https://netlify.com) and sign in
+3. Click "Add new site" → "Import an existing project"
+4. Connect to GitHub and select your repository
+5. Build settings: Leave defaults (no build command needed)
+6. Publish directory: Leave empty (root)
+7. Click "Deploy site"
+
+### Deploy to GitHub Pages
+
+1. Push your code to GitHub
+2. Go to your repository Settings → Pages
+3. Source: Deploy from a branch
+4. Branch: `main` / `root`
+5. Save - your site will be at `https://YOUR_USERNAME.github.io/reddit-viewer`
+
 ## Notes
 
 - Uses Reddit's public JSON API (no authentication required)
 - Content is sorted by upvotes (score) across all subreddits
 - Some subreddits may have rate limiting or restricted content
+- All hosting options above are free for static sites
 
