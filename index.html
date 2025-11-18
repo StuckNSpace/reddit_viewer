@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Media Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Reddit Media Viewer</h1>
+            <p class="subtitle">View photos, GIFs, and videos from your favorite subreddits</p>
+        </header>
+
+        <div class="controls">
+            <div class="input-group">
+                <label for="subreddits">Subreddits (comma-separated):</label>
+                <input 
+                    type="text" 
+                    id="subreddits" 
+                    placeholder="e.g., pics, aww, gifs, videos"
+                    value="pics, aww, gifs"
+                >
+            </div>
+            <div class="search-subreddit-group">
+                <div class="search-input-wrapper">
+                    <input 
+                        type="text" 
+                        id="subredditSearch" 
+                        placeholder="Search for subreddits by keyword..."
+                    >
+                    <button id="searchSubredditBtn" class="btn btn-search">🔍 Search</button>
+                </div>
+                <div id="searchResults" class="search-results hidden"></div>
+            </div>
+            <div class="button-group">
+                <button id="loadBtn" class="btn btn-primary">Load Content</button>
+                <button id="clearBtn" class="btn btn-secondary">Clear</button>
+            </div>
+            <div class="filter-group">
+                <label>
+                    <input type="checkbox" id="imagesOnly" checked>
+                    Images & GIFs only
+                </label>
+                <label>
+                    <input type="checkbox" id="videosOnly" checked>
+                    Videos
+                </label>
+            </div>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Loading content...</p>
+        </div>
+
+        <div id="error" class="error hidden"></div>
+
+        <div id="content" class="content-grid"></div>
+
+        <div id="loadMore" class="load-more hidden">
+            <button id="loadMoreBtn" class="btn btn-primary">Load More</button>
+        </div>
+    </div>
+
+    <!-- Fullscreen Viewer Modal -->
+    <div id="viewerModal" class="viewer-modal hidden">
+        <div class="viewer-overlay"></div>
+        <button class="viewer-close" id="closeViewer" aria-label="Close viewer">×</button>
+        
+        <div class="viewer-content">
+            <div class="viewer-media-container">
+                <img id="viewerImage" class="viewer-media hidden" alt="">
+                <video id="viewerVideo" class="viewer-media hidden" controls muted loop></video>
+            </div>
+            
+            <div class="viewer-info">
+                <div class="viewer-title" id="viewerTitle"></div>
+                <div class="viewer-meta">
+                    <span class="viewer-subreddit" id="viewerSubreddit"></span>
+                    <div class="viewer-stats" id="viewerStats"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="viewer-controls">
+            <button class="viewer-nav-btn" id="prevBtn" aria-label="Previous">‹</button>
+            <button class="viewer-nav-btn" id="nextBtn" aria-label="Next">›</button>
+        </div>
+
+        <div class="viewer-toolbar">
+            <button class="viewer-toolbar-btn" id="playPauseBtn" aria-label="Play/Pause slideshow">
+                <span id="playPauseIcon">▶</span>
+            </button>
+            <input type="range" id="slideshowSpeed" class="slideshow-speed" min="1" max="10" value="5" title="Slideshow Speed">
+            <span class="speed-label" id="speedLabel">5s</span>
+            <button class="viewer-toolbar-btn" id="fullscreenBtn" aria-label="Toggle fullscreen">⛶</button>
+        </div>
+
+        <div class="viewer-counter" id="viewerCounter"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
