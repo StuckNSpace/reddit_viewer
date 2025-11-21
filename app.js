@@ -575,56 +575,52 @@ class RedditViewer {
             // Use video element for both videos and GIFs (since Reddit serves GIFs as MP4)
             viewerVideo.src = mediaUrl;
             viewerVideo.muted = true;
-            viewerVideo.loop = true;
+            viewerVideo.loop = this.isAutoPlayMode ? false : true; // Don't loop in auto-play mode
             viewerVideo.playsInline = true;
-            viewerVideo.controls = true;
+            viewerVideo.controls = !this.isAutoPlayMode; // Hide controls in auto-play mode
             viewerVideo.classList.remove('hidden');
             
-            // Track video loops for slideshow
-            let lastTime = 0;
-            let nearEnd = false;
-            this.videoLoopHandler = () => {
-                const currentTime = viewerVideo.currentTime;
-                const duration = viewerVideo.duration;
-                
-                // Check if we're near the end (within 0.3 seconds)
-                if (duration > 0 && currentTime >= duration - 0.3) {
-                    nearEnd = true;
-                }
-                
-                // Detect when video loops back to beginning
-                // This happens when currentTime resets to near 0 after being near the end
-                if (nearEnd && currentTime < 0.5 && lastTime > 0.5) {
-                    this.videoLoopCount++;
-                    nearEnd = false;
-                    // Advance slideshow after target number of loops
-                    if (this.videoLoopCount >= this.targetLoopCount && this.isSlideshowPlaying) {
-                        // Small delay to ensure smooth transition
-                        setTimeout(() => {
-                            if (this.isSlideshowPlaying) {
-                                this.navigateViewer(1);
-                            }
-                        }, 100);
+            if (this.isAutoPlayMode) {
+                // In auto-play mode: advance when video ends
+                this.videoEndedHandler = () => {
+                    // Auto-advance when video ends in auto-play mode
+                    setTimeout(() => {
+                        if (this.isAutoPlayMode && this.isSlideshowPlaying) {
+                            this.navigateViewer(1);
+                        }
+                    }, 500);
+                };
+                viewerVideo.addEventListener('ended', this.videoEndedHandler);
+            } else {
+                // Normal mode: track video loops for slideshow
+                let lastTime = 0;
+                let nearEnd = false;
+                this.videoLoopHandler = () => {
+                    const currentTime = viewerVideo.currentTime;
+                    const duration = viewerVideo.duration;
+                    
+                    // Check if we're near the end (within 0.3 seconds)
+                    if (duration > 0 && currentTime >= duration - 0.3) {
+                        nearEnd = true;
                     }
-                }
-                lastTime = currentTime;
-            };
-            viewerVideo.addEventListener('timeupdate', this.videoLoopHandler);
-            
-            // Also listen for 'ended' event as fallback (though loop=true should prevent this)
-            this.videoEndedHandler = () => {
-                if (viewerVideo.loop) {
-                    this.videoLoopCount++;
-                    if (this.videoLoopCount >= this.targetLoopCount && this.isSlideshowPlaying) {
-                        setTimeout(() => {
-                            if (this.isSlideshowPlaying) {
-                                this.navigateViewer(1);
-                            }
-                        }, 100);
+                    
+                    // Detect when video loops back to beginning
+                    if (nearEnd && currentTime < 0.5 && lastTime > 0.5) {
+                        this.videoLoopCount++;
+                        nearEnd = false;
+                        // Advance slideshow after target number of loops
+                        if (this.videoLoopCount >= this.targetLoopCount && this.isSlideshowPlaying) {
+                            setTimeout(() => {
+                                if (this.isSlideshowPlaying) {
+                                    this.navigateViewer(1);
+                                }
+                            }, 100);
+                        }
                     }
-                }
-            };
-            viewerVideo.addEventListener('ended', this.videoEndedHandler);
+                    lastTime = currentTime;
+                };
+                viewerVideo.addEventListener('timeupdate', this.videoLoopHandler);
+            }
             
             viewerVideo.load(); // Reload video
             viewerVideo.play().catch(err => console.log('Video/GIF play failed:', err));
