@@ -750,8 +750,6 @@ class RedditViewer {
         }
     }
 
-    // Search feature removed for Android TV optimization
-    /*     // Search feature removed for Android TV optimization
 }
 
 // Initialize the viewer when the page loads
