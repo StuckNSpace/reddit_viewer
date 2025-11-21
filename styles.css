@@ -14,6 +14,7 @@
     --border-color: #2d3748;
     --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     --shadow-hover: 0 8px 16px rgba(0, 0, 0, 0.4);
+    --tv-focus: 0 0 0 4px rgba(255, 69, 0, 0.5);
 }
 
 body {
@@ -71,18 +72,21 @@ header h1 {
 
 .input-group input[type="text"] {
     width: 100%;
-    padding: 12px 16px;
+    padding: 16px 20px;
     background: var(--bg-color);
-    border: 2px solid var(--border-color);
+    border: 3px solid var(--border-color);
     border-radius: 8px;
     color: var(--text-primary);
-    font-size: 1rem;
-    transition: border-color 0.3s;
+    font-size: 1.2rem;
+    transition: all 0.3s;
+    min-height: 56px; /* Android TV minimum touch target */
+    outline: none;
 }
 
 .input-group input[type="text"]:focus {
     outline: none;
     border-color: var(--primary-color);
+    box-shadow: var(--tv-focus);
 }
 
 .button-group {
@@ -92,15 +96,30 @@ header h1 {
 }
 
 .btn {
-    padding: 12px 24px;
+    padding: 16px 32px;
     border: none;
     border-radius: 8px;
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    min-height: 56px; /* Android TV minimum touch target */
+    outline: none;
+}
+
+/* Android TV focus states */
+.btn:focus,
+.btn:focus-visible {
+    outline: 4px solid var(--primary-color);
+    outline-offset: 4px;
+    box-shadow: var(--tv-focus);
+}
+
+.btn.active {
+    background: var(--primary-hover);
+    box-shadow: var(--tv-focus);
 }
 
 .btn-primary {
@@ -108,7 +127,8 @@ header h1 {
     color: white;
 }
 
-.btn-primary:hover {
+.btn-primary:hover,
+.btn-primary:focus {
     background: var(--primary-hover);
     transform: translateY(-2px);
     box-shadow: var(--shadow-hover);
@@ -119,8 +139,23 @@ header h1 {
     color: var(--text-primary);
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover,
+.btn-secondary:focus {
     background: #3d4756;
+}
+
+.btn-mix,
+.btn-autoplay {
+    background: var(--border-color);
+    color: var(--text-primary);
+}
+
+.btn-mix:hover,
+.btn-mix:focus,
+.btn-autoplay:hover,
+.btn-autoplay:focus {
+    background: #3d4756;
+    transform: translateY(-2px);
 }
 
 .filter-group {
@@ -314,11 +349,17 @@ header h1 {
     box-shadow: var(--shadow);
     transition: transform 0.3s, box-shadow 0.3s;
     cursor: pointer;
+    outline: none;
+    border: 3px solid transparent;
 }
 
-.media-card:hover {
-    transform: translateY(-4px);
+.media-card:hover,
+.media-card:focus {
+    transform: translateY(-4px) scale(1.02);
     box-shadow: var(--shadow-hover);
+    border-color: var(--primary-color);
+    outline: 4px solid var(--primary-color);
+    outline-offset: 4px;
 }
 
 .media-container {
@@ -731,6 +772,41 @@ header h1 {
 }
 
 /* Mobile responsive */
+/* Android TV optimizations */
+@media (min-width: 1280px) {
+    .btn {
+        padding: 20px 40px;
+        font-size: 1.2rem;
+        min-height: 64px;
+    }
+
+    .input-group input[type="text"] {
+        padding: 20px 24px;
+        font-size: 1.3rem;
+        min-height: 64px;
+    }
+
+    .media-card {
+        border-width: 4px;
+    }
+
+    .content-grid {
+        gap: 30px;
+    }
+
+    .viewer-nav-btn {
+        width: 90px;
+        height: 90px;
+        font-size: 5rem;
+    }
+
+    .viewer-toolbar-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 2rem;
+    }
+}
+
 @media (max-width: 768px) {
     .viewer-title {
         font-size: 1.2rem;

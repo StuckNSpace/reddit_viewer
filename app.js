@@ -11,10 +11,12 @@ class RedditViewer {
         this.slideshowSpeed = 5000; // 5 seconds
         this.isSlideshowPlaying = false;
         this.videoLoopCount = 0;
-        this.targetLoopCount = 3;
+        this.targetLoopCount = 1; // Auto-advance after 1 play for auto-play mode
         this.currentMediaIsVideo = false;
         this.videoLoopHandler = null;
         this.videoEndedHandler = null;
+        this.isShuffled = false;
+        this.isAutoPlayMode = false;
         
         this.initializeEventListeners();
         this.initializeViewer();
@@ -40,13 +42,11 @@ class RedditViewer {
             }
         });
 
-        // Subreddit search
-        document.getElementById('searchSubredditBtn').addEventListener('click', () => this.searchSubreddits());
-        document.getElementById('subredditSearch').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.searchSubreddits();
-            }
-        });
+        // Mix/Shuffle button
+        document.getElementById('mixBtn').addEventListener('click', () => this.toggleShuffle());
+        
+        // Auto-Play Mode button
+        document.getElementById('autoPlayBtn').addEventListener('click', () => this.startAutoPlayMode());
     }
 
     initializeViewer() {
@@ -72,18 +72,23 @@ class RedditViewer {
         // Fullscreen
         document.getElementById('fullscreenBtn').addEventListener('click', () => this.toggleFullscreen());
         
-        // Keyboard navigation
+        // Keyboard navigation (Android TV remote support)
         document.addEventListener('keydown', (e) => {
             if (!document.getElementById('viewerModal').classList.contains('hidden')) {
-                if (e.key === 'Escape') {
+                if (e.key === 'Escape' || e.key === 'Backspace') {
                     this.closeViewer();
                 } else if (e.key === 'ArrowLeft') {
                     this.navigateViewer(-1);
                 } else if (e.key === 'ArrowRight') {
                     this.navigateViewer(1);
-                } else if (e.key === ' ') {
+                } else if (e.key === ' ' || e.key === 'Enter') {
                     e.preventDefault();
                     this.toggleSlideshow();
+                }
+            } else {
+                // Navigation when viewer is closed
+                if (e.key === 'Enter' && document.activeElement.id === 'loadBtn') {
+                    this.loadContent();
                 }
             }
         });
@@ -173,8 +178,58 @@ class RedditViewer {
             return true;
         });
 
+        // Shuffle if mix mode is enabled
+        if (this.isShuffled) {
+            this.shuffleArray(filtered);
+        }
+
         this.filteredPosts = filtered;
         this.displayPosts(filtered);
+    }
+
+    shuffleArray(array) {
+        // Fisher-Yates shuffle algorithm
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    toggleShuffle() {
+        this.isShuffled = !this.isShuffled;
+        const mixBtn = document.getElementById('mixBtn');
+        if (this.isShuffled) {
+            mixBtn.classList.add('active');
+            mixBtn.textContent = '🔀 Shuffled';
+        } else {
+            mixBtn.classList.remove('active');
+            mixBtn.textContent = '🔀 Mix/Shuffle';
+        }
+        // Re-filter and display with new shuffle state
+        this.filterAndDisplay();
+    }
+
+    startAutoPlayMode() {
+        if (this.filteredPosts.length === 0) {
+            this.showError('Please load content first');
+            return;
+        }
+
+        this.isAutoPlayMode = true;
+        this.targetLoopCount = 1; // Auto-advance after 1 play
+        const autoPlayBtn = document.getElementById('autoPlayBtn');
+        autoPlayBtn.classList.add('active');
+        autoPlayBtn.textContent = '⏸ Auto-Play Active';
+
+        // Start from first item or random
+        const startIndex = this.isShuffled ? Math.floor(Math.random() * this.filteredPosts.length) : 0;
+        this.openViewer(startIndex, true);
+        
+        // Auto-enter fullscreen
+        setTimeout(() => {
+            this.toggleFullscreen();
+        }, 500);
     }
 
     isImage(url) {
@@ -599,6 +654,11 @@ class RedditViewer {
         const modal = document.getElementById('viewerModal');
         const viewerVideo = document.getElementById('viewerVideo');
         
+        // Exit fullscreen if in auto-play mode
+        if (this.isAutoPlayMode && document.fullscreenElement) {
+            document.exitFullscreen();
+        }
+        
         modal.classList.add('hidden');
         document.body.style.overflow = '';
         
@@ -614,6 +674,14 @@ class RedditViewer {
             this.videoEndedHandler = null;
         }
         this.stopSlideshow();
+        
+        // Reset auto-play mode
+        if (this.isAutoPlayMode) {
+            this.isAutoPlayMode = false;
+            const autoPlayBtn = document.getElementById('autoPlayBtn');
+            autoPlayBtn.classList.remove('active');
+            autoPlayBtn.textContent = '▶ Auto-Play Mode';
+        }
         
         this.currentViewerIndex = -1;
         this.videoLoopCount = 0;
@@ -643,10 +711,11 @@ class RedditViewer {
         document.getElementById('playPauseIcon').textContent = '⏸';
         
         // For images, use time-based slideshow
-        // For videos/GIFs, advancement is handled by loop count tracking
+        // For videos/GIFs, advancement is handled by loop count tracking or ended event
         this.slideshowInterval = setInterval(() => {
             // Only advance if current media is NOT a video/GIF (images use time-based)
-            if (!this.currentMediaIsVideo) {
+            // In auto-play mode, videos advance via ended event, so skip interval for videos
+            if (!this.currentMediaIsVideo || !this.isAutoPlayMode) {
                 this.navigateViewer(1);
             }
         }, this.slideshowSpeed);
@@ -681,185 +750,8 @@ class RedditViewer {
         }
     }
 
-    async searchSubreddits() {
-        const searchInput = document.getElementById('subredditSearch');
-        const query = searchInput.value.trim();
-        
-        if (!query) {
-            this.showError('Please enter a search keyword');
-            return;
-        }
-
-        const searchResults = document.getElementById('searchResults');
-        searchResults.classList.remove('hidden');
-        searchResults.innerHTML = '<div class="search-loading">Searching...</div>';
-
-        try {
-            // Try multiple endpoints in order of preference
-            let subreddits = [];
-            let data = null;
-            
-            // Method 1: Try search_subreddits endpoint (newer API)
-            try {
-                const url1 = `https://www.reddit.com/api/search_subreddits.json?query=${encodeURIComponent(query)}`;
-                const response1 = await fetch(url1, {
-                    headers: {
-                        'User-Agent': 'RedditViewer/1.0'
-                    }
-                });
-                if (response1.ok) {
-                    data = await response1.json();
-                    console.log('Method 1 response:', data);
-                    if (data.subreddits && Array.isArray(data.subreddits)) {
-                        subreddits = data.subreddits;
-                    }
-                } else {
-                    console.log('Method 1 HTTP error:', response1.status);
-                }
-            } catch (e) {
-                console.log('Method 1 failed:', e);
-            }
-            
-            // Method 2: Try subreddits/search endpoint (classic API)
-            if (subreddits.length === 0) {
-                try {
-                    const url2 = `https://www.reddit.com/subreddits/search.json?q=${encodeURIComponent(query)}&limit=20&sort=relevance`;
-                    const response2 = await fetch(url2, {
-                        headers: {
-                            'User-Agent': 'RedditViewer/1.0'
-                        }
-                    });
-                    if (response2.ok) {
-                        data = await response2.json();
-                        console.log('Method 2 response:', data);
-                        if (data.data && data.data.children && data.data.children.length > 0) {
-                            subreddits = data.data.children.map(child => child.data);
-                        }
-                    } else {
-                        console.log('Method 2 HTTP error:', response2.status);
-                    }
-                } catch (e) {
-                    console.log('Method 2 failed:', e);
-                }
-            }
-            
-            // Method 3: Try search endpoint with type=sr (subreddit)
-            if (subreddits.length === 0) {
-                try {
-                    const url3 = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&type=sr&limit=20`;
-                    const response3 = await fetch(url3, {
-                        headers: {
-                            'User-Agent': 'RedditViewer/1.0'
-                        }
-                    });
-                    if (response3.ok) {
-                        data = await response3.json();
-                        console.log('Method 3 response:', data);
-                        if (data.data && data.data.children) {
-                            subreddits = data.data.children
-                                .map(child => child.data)
-                                .filter(item => item.subreddit || item.display_name); // Filter to only subreddits
-                        }
-                    } else {
-                        console.log('Method 3 HTTP error:', response3.status);
-                    }
-                } catch (e) {
-                    console.log('Method 3 failed:', e);
-                }
-            }
-            
-            if (subreddits.length === 0 && data) {
-                console.log('API Response:', data);
-            }
-            
-            if (subreddits.length === 0) {
-                searchResults.innerHTML = '<div class="search-no-results">No subreddits found. Try a different keyword.</div>';
-                return;
-            }
-
-            let resultsHTML = '<div class="search-results-header">Found Subreddits (click to add):</div><div class="search-results-list">';
-            
-            subreddits.forEach(subreddit => {
-                // Handle different response formats
-                let name = subreddit.name || subreddit.display_name || subreddit.subreddit || '';
-                // Clean up name - remove r/ prefix if present
-                name = name.replace(/^r\//, '').trim();
-                
-                if (!name) {
-                    console.log('Skipping subreddit with no name:', subreddit);
-                    return; // Skip if no name
-                }
-                
-                const subscribers = this.formatNumber(
-                    subreddit.subscriber_count || 
-                    subreddit.subscribers || 
-                    subreddit.subreddit_subscribers ||
-                    0
-                );
-                const description = subreddit.public_description || 
-                                  subreddit.description || 
-                                  subreddit.subreddit_metadata?.public_description || 
-                                  subreddit.title ||
-                                  'No description';
-                const truncatedDesc = description.length > 100 ? description.substring(0, 100) + '...' : description;
-                
-                resultsHTML += `
-                    <div class="search-result-item" data-subreddit="${name}">
-                        <div class="search-result-header">
-                            <span class="search-result-name">r/${name}</span>
-                            <span class="search-result-subscribers">👥 ${subscribers}</span>
-                        </div>
-                        <div class="search-result-description">${truncatedDesc}</div>
-                    </div>
-                `;
-            });
-            
-            resultsHTML += '</div>';
-            searchResults.innerHTML = resultsHTML;
-
-            // Add click handlers to result items
-            searchResults.querySelectorAll('.search-result-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    const subredditName = item.dataset.subreddit;
-                    this.addSubreddit(subredditName);
-                });
-            });
-
-        } catch (error) {
-            console.error('Search error:', error);
-            searchResults.innerHTML = `<div class="search-error">Failed to search subreddits: ${error.message}. Please try again.</div>`;
-        }
-    }
-
-    addSubreddit(name) {
-        const subredditsInput = document.getElementById('subreddits');
-        const currentSubreddits = subredditsInput.value.trim();
-        const subredditList = currentSubreddits 
-            ? currentSubreddits.split(',').map(s => s.trim())
-            : [];
-        
-        // Check if already added
-        if (subredditList.includes(name)) {
-            this.showError(`r/${name} is already in your list`);
-            return;
-        }
-        
-        // Add the new subreddit
-        subredditList.push(name);
-        subredditsInput.value = subredditList.join(', ');
-        
-        // Visual feedback
-        const searchInput = document.getElementById('subredditSearch');
-        searchInput.value = '';
-        const searchResults = document.getElementById('searchResults');
-        searchResults.classList.add('hidden');
-        
-        // Highlight the input briefly
-        subredditsInput.style.background = 'rgba(255, 69, 0, 0.2)';
-        setTimeout(() => {
-            subredditsInput.style.background = '';
-        }, 1000);
-    }
+    // Search feature removed for Android TV optimization
+    /*     // Search feature removed for Android TV optimization
 }
 
 // Initialize the viewer when the page loads

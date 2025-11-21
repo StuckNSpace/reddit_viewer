@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Reddit Media Viewer</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -23,19 +24,10 @@
                     value="pics, aww, gifs"
                 >
             </div>
-            <div class="search-subreddit-group">
-                <div class="search-input-wrapper">
-                    <input 
-                        type="text" 
-                        id="subredditSearch" 
-                        placeholder="Search for subreddits by keyword..."
-                    >
-                    <button id="searchSubredditBtn" class="btn btn-search">🔍 Search</button>
-                </div>
-                <div id="searchResults" class="search-results hidden"></div>
-            </div>
             <div class="button-group">
                 <button id="loadBtn" class="btn btn-primary">Load Content</button>
+                <button id="mixBtn" class="btn btn-mix">🔀 Mix/Shuffle</button>
+                <button id="autoPlayBtn" class="btn btn-autoplay">▶ Auto-Play Mode</button>
                 <button id="clearBtn" class="btn btn-secondary">Clear</button>
             </div>
             <div class="filter-group">
