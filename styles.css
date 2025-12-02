@@ -70,8 +70,14 @@ header h1 {
     font-weight: 500;
 }
 
+.input-wrapper {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+}
+
 .input-group input[type="text"] {
-    width: 100%;
+    flex: 1;
     padding: 16px 20px;
     background: var(--bg-color);
     border: 3px solid var(--border-color);
@@ -87,6 +93,85 @@ header h1 {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: var(--tv-focus);
+}
+
+.btn-keyboard {
+    padding: 16px 24px;
+    background: var(--border-color);
+    border: 3px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    min-height: 56px;
+    min-width: 70px;
+    outline: none;
+}
+
+.btn-keyboard:hover,
+.btn-keyboard:focus {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    box-shadow: var(--tv-focus);
+}
+
+.virtual-keyboard {
+    margin-top: 15px;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.virtual-keyboard.hidden {
+    display: none;
+}
+
+.keyboard-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.key {
+    min-width: 60px;
+    min-height: 60px;
+    padding: 12px 16px;
+    background: var(--bg-color);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    outline: none;
+    flex: 1;
+    max-width: 100px;
+}
+
+.key:hover,
+.key:focus {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    transform: scale(1.05);
+    box-shadow: var(--tv-focus);
+}
+
+.key-special {
+    background: var(--border-color);
+    min-width: 120px;
+    font-size: 1rem;
+}
+
+.key-special:hover,
+.key-special:focus {
+    background: var(--primary-hover);
 }
 
 .button-group {

@@ -36,10 +36,45 @@ class RedditViewer {
         });
 
         // Load on Enter key
-        document.getElementById('subreddits').addEventListener('keypress', (e) => {
+        const subredditsInput = document.getElementById('subreddits');
+        subredditsInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.loadContent();
             }
+        });
+
+        // Android TV: Force focus and show keyboard on input focus
+        subredditsInput.addEventListener('focus', () => {
+            // Try to trigger virtual keyboard
+            subredditsInput.click();
+            // Show virtual keyboard as fallback
+            this.showVirtualKeyboard();
+        });
+
+        // Virtual keyboard controls
+        document.getElementById('showKeyboardBtn').addEventListener('click', () => {
+            this.showVirtualKeyboard();
+            subredditsInput.focus();
+        });
+
+        document.getElementById('closeKeyboardBtn').addEventListener('click', () => {
+            this.hideVirtualKeyboard();
+        });
+
+        // Setup virtual keyboard keys
+        document.querySelectorAll('.key').forEach(key => {
+            key.addEventListener('click', () => {
+                const keyValue = key.dataset.key;
+                if (keyValue === 'backspace') {
+                    const current = subredditsInput.value;
+                    subredditsInput.value = current.slice(0, -1);
+                } else if (keyValue === 'clear') {
+                    subredditsInput.value = '';
+                } else {
+                    subredditsInput.value += keyValue;
+                }
+                subredditsInput.focus();
+            });
         });
 
         // Mix/Shuffle button
@@ -47,6 +82,16 @@ class RedditViewer {
         
         // Auto-Play Mode button
         document.getElementById('autoPlayBtn').addEventListener('click', () => this.startAutoPlayMode());
+    }
+
+    showVirtualKeyboard() {
+        const keyboard = document.getElementById('virtualKeyboard');
+        keyboard.classList.remove('hidden');
+    }
+
+    hideVirtualKeyboard() {
+        const keyboard = document.getElementById('virtualKeyboard');
+        keyboard.classList.add('hidden');
     }
 
     initializeViewer() {
