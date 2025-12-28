@@ -1133,13 +1133,20 @@ class RedditViewer {
             playPauseIcon.textContent = '⏸';
         }
         
-        // For images, use time-based slideshow
-        // For videos/GIFs, advancement is handled by loop count tracking or ended event
+        // For images and GIFs, use time-based slideshow
+        // For videos, advancement is handled by 'ended' event (plays through fully)
         this.slideshowInterval = setInterval(() => {
-            // Only advance if current media is NOT a video/GIF (images use time-based)
-            // In auto-play mode, videos advance via ended event, so skip interval for videos
-            if (!this.currentMediaIsVideo || !this.isAutoPlayMode) {
-                this.navigateViewer(1);
+            if (this.currentViewerIndex >= 0 && this.currentViewerIndex < this.filteredPosts.length) {
+                const currentPost = this.filteredPosts[this.currentViewerIndex];
+                const mediaType = this.getMediaType(currentPost);
+                const isVideo = mediaType === 'video';
+                
+                // Advance images and GIFs based on time
+                // Videos advance via 'ended' event after full playthrough
+                if (!isVideo) {
+                    this.navigateViewer(1);
+                }
+                // Videos: will advance via 'ended' event handler
             }
         }, this.slideshowSpeed);
     }
