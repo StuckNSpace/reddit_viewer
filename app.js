@@ -636,7 +636,7 @@ class RedditViewer {
             
             // Error handling - log the actual URL being used
             video.onerror = (() => {
-                console.error('Video/GIF load error:', videoUrl, 'Original:', mediaUrl);
+                console.error('Video/GIF load error - URL used:', video.src, 'Converted from:', mediaUrl, 'Video element src:', video.src);
                 const postUrl = post.url;
                 const postTitle = post.title;
                 return function() {
@@ -1084,7 +1084,13 @@ class RedditViewer {
             // getMediaUrl should already return DASH, but double-check here
             let videoUrl = this.convertToDASH(mediaUrl);
             if (videoUrl !== mediaUrl) {
-                console.log('Converted URL to DASH:', mediaUrl, '->', videoUrl);
+                console.log('Viewer: Converted URL to DASH:', mediaUrl, '->', videoUrl);
+            }
+            // Final safety check - if it still contains CMAF, force conversion
+            if (videoUrl.includes('CMAF')) {
+                console.warn('Viewer: CMAF still in URL after conversion! Forcing DASH:', videoUrl);
+                videoUrl = videoUrl.replace('/CMAF_', '/DASH_');
+                console.log('Viewer: Forced conversion result:', videoUrl);
             }
             
             // Set attributes before setting src to ensure proper loading
