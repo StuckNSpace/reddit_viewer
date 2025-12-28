@@ -806,9 +806,17 @@ class RedditViewer {
             let mp4Url = post.preview.images[0].variants.mp4.source.url.replace(/&amp;/g, '&');
             // Make sure it's a full URL
             if (mp4Url.startsWith('http')) {
-                // Convert CMAF to DASH if needed
+                // ALWAYS convert CMAF to DASH - CMAF doesn't work in browsers
                 if (mp4Url.includes('CMAF')) {
                     mp4Url = mp4Url.replace('/CMAF_', '/DASH_');
+                }
+                // If it's v.redd.it but no format specified, construct DASH URL
+                if (mp4Url.includes('v.redd.it') && !mp4Url.includes('DASH_') && !mp4Url.includes('HLS')) {
+                    const videoIdMatch = mp4Url.match(/v\.redd\.it\/([^\/]+)/);
+                    if (videoIdMatch) {
+                        const videoId = videoIdMatch[1];
+                        mp4Url = `https://v.redd.it/${videoId}/DASH_720.mp4`;
+                    }
                 }
                 return mp4Url;
             }
@@ -816,9 +824,17 @@ class RedditViewer {
         if (post.preview?.images?.[0]?.variants?.gif?.source?.url) {
             let gifUrl = post.preview.images[0].variants.gif.source.url.replace(/&amp;/g, '&');
             if (gifUrl.startsWith('http')) {
-                // Convert CMAF to DASH if needed
+                // ALWAYS convert CMAF to DASH
                 if (gifUrl.includes('CMAF')) {
                     gifUrl = gifUrl.replace('/CMAF_', '/DASH_');
+                }
+                // If it's v.redd.it but no format specified, construct DASH URL
+                if (gifUrl.includes('v.redd.it') && !gifUrl.includes('DASH_') && !gifUrl.includes('HLS')) {
+                    const videoIdMatch = gifUrl.match(/v\.redd\.it\/([^\/]+)/);
+                    if (videoIdMatch) {
+                        const videoId = videoIdMatch[1];
+                        gifUrl = `https://v.redd.it/${videoId}/DASH_720.mp4`;
+                    }
                 }
                 return gifUrl;
             }
