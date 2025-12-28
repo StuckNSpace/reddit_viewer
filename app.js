@@ -749,7 +749,8 @@ class RedditViewer {
             // Don't trigger if clicking on the card itself during hover
             const index = this.filteredPosts.findIndex(p => p.id === post.id);
             if (index !== -1) {
-                this.openViewer(index);
+                // Open viewer in manual mode (no auto-start slideshow)
+                this.openViewer(index, false);
             }
         });
 
