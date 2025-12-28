@@ -845,6 +845,8 @@ class RedditViewer {
         if (!post) return '';
         
         console.log('getMediaUrl called for post:', post.id, 'URL:', post.url);
+        console.log('Post media object:', JSON.stringify(post.media, null, 2));
+        console.log('Post preview object:', JSON.stringify(post.preview, null, 2));
         
         // Reddit video - check multiple possible locations (following API docs)
         if (post.is_video || post.domain === 'v.redd.it') {
