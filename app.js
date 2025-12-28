@@ -623,13 +623,20 @@ class RedditViewer {
                 video.poster = thumbnailUrl;
             }
             
-            // Only convert CMAF URLs to DASH - if Reddit provided a DASH URL, use it as-is
+            // Handle HLS URLs (need special handling per API docs)
             let videoUrl = mediaUrl;
-            if (mediaUrl.includes('CMAF')) {
+            if (mediaUrl.includes('.m3u8') || mediaUrl.includes('HLS')) {
+                // HLS URLs need to be used with a source element or HLS.js library
+                // For now, try using it directly - modern browsers may support it
+                console.log('Grid: Using HLS URL:', mediaUrl);
+            } else if (mediaUrl.includes('CMAF')) {
+                // Only convert CMAF URLs to DASH
                 videoUrl = this.convertToDASH(mediaUrl);
                 console.log('Grid: Converted CMAF to DASH:', mediaUrl, '->', videoUrl);
+            } else {
+                // Use Reddit's provided URL as-is (should be DASH or direct MP4)
+                console.log('Grid: Using Reddit-provided URL as-is:', mediaUrl);
             }
-            // Don't convert Reddit's provided DASH URLs - they should work as-is
             
             // Store fallback URLs for error handling
             const videoIdMatch = videoUrl.match(/v\.redd\.it\/([^\/]+)/);
