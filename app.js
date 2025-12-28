@@ -624,11 +624,8 @@ class RedditViewer {
             }
             
             // Fix CMAF URLs to DASH format (CMAF doesn't work in browsers)
-            let videoUrl = mediaUrl;
-            if (videoUrl.includes('v.redd.it') && videoUrl.includes('CMAF')) {
-                // Convert CMAF to DASH: CMAF_1080.mp4 -> DASH_1080.mp4
-                videoUrl = videoUrl.replace('/CMAF_', '/DASH_');
-            }
+            // getMediaUrl should already return DASH, but double-check here
+            let videoUrl = this.convertToDASH(mediaUrl);
             
             // Set src and load immediately - this preloads the video when post is displayed
             video.src = videoUrl;
@@ -1065,13 +1062,11 @@ class RedditViewer {
             // Use video element for MP4-converted GIFs and videos
             console.log('Loading video/GIF:', mediaUrl, 'Type:', mediaType, 'IsGIF:', isGif);
             
-            // Try to fix CMAF URLs to DASH format (DASH works better in browsers)
-            // CMAF URLs like v.redd.it/xxx/CMAF_1080.mp4 don't work, need DASH_1080.mp4
-            let videoUrl = mediaUrl;
-            if (videoUrl.includes('v.redd.it') && videoUrl.includes('CMAF')) {
-                // Convert CMAF to DASH: CMAF_1080.mp4 -> DASH_1080.mp4
-                videoUrl = videoUrl.replace('/CMAF_', '/DASH_');
-                console.log('Converted CMAF to DASH URL:', videoUrl);
+            // Fix CMAF URLs to DASH format (CMAF doesn't work in browsers)
+            // getMediaUrl should already return DASH, but double-check here
+            let videoUrl = this.convertToDASH(mediaUrl);
+            if (videoUrl !== mediaUrl) {
+                console.log('Converted URL to DASH:', mediaUrl, '->', videoUrl);
             }
             
             // Set attributes before setting src to ensure proper loading
