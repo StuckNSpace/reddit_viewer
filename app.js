@@ -661,35 +661,21 @@ class RedditViewer {
             // Store URL for reuse in viewer (store original URL, not converted)
             video.dataset.mediaUrl = mediaUrl;
             
-            // Error handling with fallback URLs
+            // Error handling - if video fails, show thumbnail as clickable link to Reddit
             video.onerror = (() => {
                 const actualSrc = video.src;
-                const fallbackUrlsJson = video.dataset.fallbackUrls;
-                const fallbackUrls = fallbackUrlsJson ? JSON.parse(fallbackUrlsJson) : [];
-                let fallbackIndex = parseInt(video.dataset.fallbackIndex || '0');
+                console.error('Grid Video/GIF load error - Element src:', actualSrc, 'Original mediaUrl:', mediaUrl, 'Error:', video.error);
                 
-                console.error('Grid Video/GIF load error - Element src:', actualSrc, 'Converted from:', mediaUrl, 'Video element readyState:', video.readyState);
-                
-                // Try next fallback URL if available
-                if (fallbackIndex < fallbackUrls.length) {
-                    const nextUrl = fallbackUrls[fallbackIndex];
-                    console.log('Grid: Trying fallback URL', fallbackIndex + 1, 'of', fallbackUrls.length, ':', nextUrl);
-                    fallbackIndex++;
-                    video.dataset.fallbackIndex = fallbackIndex.toString();
-                    video.src = nextUrl;
-                    video.load();
-                    return;
-                }
-                
-                // All fallbacks failed, show error image
-                console.error('Grid: All video URLs failed, showing error image');
-                const postUrl = post.url;
-                const postTitle = post.title;
+                // Show thumbnail as clickable link to Reddit post
                 const img = document.createElement('img');
-                img.src = postUrl || mediaUrl;
-                img.alt = postTitle;
-                img.onerror = function() {
-                    this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%231a1f2e" width="400" height="400"/%3E%3Ctext fill="%23b0b8c4" font-family="sans-serif" font-size="18" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EMedia not available%3C/text%3E%3C/svg%3E';
+                const thumbnailUrl = this.getThumbnailUrl(post);
+                img.src = thumbnailUrl || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%231a1f2e" width="400" height="400"/%3E%3Ctext fill="%23b0b8c4" font-family="sans-serif" font-size="18" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EClick to view on Reddit%3C/text%3E%3C/svg%3E';
+                img.alt = post.title;
+                img.style.cursor = 'pointer';
+                img.title = 'Click to view on Reddit (video not available)';
+                img.onclick = () => {
+                    // Open Reddit post in new tab
+                    window.open(`https://reddit.com${post.permalink}`, '_blank');
                 };
                 if (video.parentNode) {
                     video.parentNode.replaceChild(img, video);
@@ -949,20 +935,20 @@ class RedditViewer {
             }
         }
         
-        // Last resort: Try to construct DASH URL from v.redd.it URL
-        if (post.url && post.url.includes('v.redd.it')) {
-            // Extract video ID from URL (format: v.redd.it/VIDEO_ID/...)
-            const videoIdMatch = post.url.match(/v\.redd\.it\/([^\/\?]+)/);
-            if (videoIdMatch) {
-                const videoId = videoIdMatch[1];
-                // Try DASH_480 first (most reliable)
-                const dashUrl = `https://v.redd.it/${videoId}/DASH_480.mp4`;
-                console.log('getMediaUrl: Constructed DASH URL from post.url (last resort):', post.url, '->', dashUrl);
-                return dashUrl;
-            }
-        }
+        // DO NOT construct URLs - Reddit blocks them with 403 Forbidden
+        // Only use URLs that Reddit provides in the API response
+        console.warn('getMediaUrl: No usable media URL found for post:', post.id);
+        console.warn('Post data:', {
+            url: post.url,
+            is_video: post.is_video,
+            domain: post.domain,
+            has_media: !!post.media,
+            has_secure_media: !!post.secure_media,
+            has_preview: !!post.preview
+        });
         
-        console.warn('getMediaUrl: No media URL found for post:', post.id, post);
+        // Return empty string - we'll show thumbnail/error image instead
+        return '';
 
         // For direct GIF URLs, use the URL directly
         if (post.url && /\.gif$/i.test(post.url)) {
