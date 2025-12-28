@@ -829,30 +829,50 @@ class RedditViewer {
             
             // Try reddit_video fallback_url (this is the DASH URL from Reddit)
             if (post.media?.reddit_video?.fallback_url) {
-                const url = post.media.reddit_video.fallback_url;
-                console.log('getMediaUrl: Using media.reddit_video.fallback_url (from Reddit):', url);
-                return url; // Use Reddit's provided URL as-is
+                let url = post.media.reddit_video.fallback_url;
+                // Convert CMAF to DASH if needed
+                if (url.includes('CMAF')) {
+                    url = this.convertToDASH(url);
+                    console.log('getMediaUrl: Converted CMAF to DASH:', post.media.reddit_video.fallback_url, '->', url);
+                }
+                console.log('getMediaUrl: Using media.reddit_video.fallback_url:', url);
+                return url;
             }
             // Try secure_media
             if (post.secure_media?.reddit_video?.fallback_url) {
-                const url = post.secure_media.reddit_video.fallback_url;
-                console.log('getMediaUrl: Using secure_media.reddit_video.fallback_url (from Reddit):', url);
-                return url; // Use Reddit's provided URL as-is
+                let url = post.secure_media.reddit_video.fallback_url;
+                // Convert CMAF to DASH if needed
+                if (url.includes('CMAF')) {
+                    url = this.convertToDASH(url);
+                    console.log('getMediaUrl: Converted CMAF to DASH:', post.secure_media.reddit_video.fallback_url, '->', url);
+                }
+                console.log('getMediaUrl: Using secure_media.reddit_video.fallback_url:', url);
+                return url;
             }
             // Try crosspost parent
             if (post.crosspost_parent_list?.[0]?.media?.reddit_video?.fallback_url) {
-                const url = post.crosspost_parent_list[0].media.reddit_video.fallback_url;
-                console.log('getMediaUrl: Using crosspost reddit_video.fallback_url (from Reddit):', url);
-                return url; // Use Reddit's provided URL as-is
+                let url = post.crosspost_parent_list[0].media.reddit_video.fallback_url;
+                // Convert CMAF to DASH if needed
+                if (url.includes('CMAF')) {
+                    url = this.convertToDASH(url);
+                    console.log('getMediaUrl: Converted CMAF to DASH:', post.crosspost_parent_list[0].media.reddit_video.fallback_url, '->', url);
+                }
+                console.log('getMediaUrl: Using crosspost reddit_video.fallback_url:', url);
+                return url;
             }
         }
 
         // For GIFs that Reddit converted to MP4, check for reddit_video_preview FIRST
         // This gives us the DASH URL (fallback_url) which works in browsers
         if (post.preview?.reddit_video_preview?.fallback_url) {
-            const url = post.preview.reddit_video_preview.fallback_url;
-            console.log('getMediaUrl: Using preview.reddit_video_preview.fallback_url (from Reddit):', url);
-            return url; // Use Reddit's provided URL as-is
+            let url = post.preview.reddit_video_preview.fallback_url;
+            // Convert CMAF to DASH if needed (CMAF doesn't work in browsers)
+            if (url.includes('CMAF')) {
+                url = this.convertToDASH(url);
+                console.log('getMediaUrl: Converted CMAF to DASH:', post.preview.reddit_video_preview.fallback_url, '->', url);
+            }
+            console.log('getMediaUrl: Using preview.reddit_video_preview.fallback_url:', url);
+            return url;
         }
         
         // For animated GIFs/MP4s, check variants - look for DASH variant first
