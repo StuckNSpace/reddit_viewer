@@ -607,80 +607,87 @@ class RedditViewer {
         const mediaType = this.getMediaType(post);
 
         if (mediaType === 'video' || mediaType === 'gif') {
-            // Use video element for both videos and GIFs (since Reddit serves GIFs as MP4)
-            const video = document.createElement('video');
+            // Create wrapper for thumbnail and video
+            const mediaWrapper = document.createElement('div');
+            mediaWrapper.className = 'media-wrapper';
+            mediaWrapper.style.position = 'relative';
+            mediaWrapper.style.width = '100%';
+            mediaWrapper.style.height = '100%';
             
-            // Set attributes first
-            video.controls = false; // Hide controls for cleaner look, show on hover
+            // Always show thumbnail first
+            const thumbnail = document.createElement('img');
+            const thumbnailUrl = this.getThumbnailUrl(post);
+            thumbnail.src = thumbnailUrl || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%231a1f2e" width="400" height="400"/%3E%3Ctext fill="%23b0b8c4" font-family="sans-serif" font-size="18" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ELoading...%3C/text%3E%3C/svg%3E';
+            thumbnail.alt = post.title;
+            thumbnail.style.width = '100%';
+            thumbnail.style.height = '100%';
+            thumbnail.style.objectFit = 'cover';
+            thumbnail.style.display = 'block';
+            
+            // Create video element (hidden initially)
+            const video = document.createElement('video');
+            video.style.width = '100%';
+            video.style.height = '100%';
+            video.style.objectFit = 'cover';
+            video.style.display = 'none';
             video.muted = true;
             video.loop = true;
             video.playsInline = true;
-            video.preload = 'auto'; // Preload full video for faster display
+            video.preload = 'metadata';
+            video.poster = thumbnailUrl;
             
-            // Add poster/thumbnail for faster initial display
-            const thumbnailUrl = this.getThumbnailUrl(post);
-            if (thumbnailUrl) {
-                video.poster = thumbnailUrl;
-            }
-            
-            // Handle HLS URLs (need special handling per API docs)
-            let videoUrl = mediaUrl;
-            if (mediaUrl.includes('.m3u8') || mediaUrl.includes('HLS')) {
-                // HLS URLs need to be used with a source element or HLS.js library
-                // For now, try using it directly - modern browsers may support it
-                console.log('Grid: Using HLS URL:', mediaUrl);
-            } else if (mediaUrl.includes('CMAF')) {
-                // Only convert CMAF URLs to DASH
-                videoUrl = this.convertToDASH(mediaUrl);
-                console.log('Grid: Converted CMAF to DASH:', mediaUrl, '->', videoUrl);
-            } else {
-                // Use Reddit's provided URL as-is (should be DASH or direct MP4)
-                console.log('Grid: Using Reddit-provided URL as-is:', mediaUrl);
-            }
-            
-            // Store fallback URLs for error handling
-            const videoIdMatch = videoUrl.match(/v\.redd\.it\/([^\/]+)/);
-            if (videoIdMatch) {
-                const videoId = videoIdMatch[1];
-                let fallbackUrls = this.getVideoFallbackUrls(videoId);
-                // Remove the current URL from fallbacks to avoid retrying it
-                fallbackUrls = fallbackUrls.filter(url => url !== videoUrl);
-                video.dataset.fallbackUrls = JSON.stringify(fallbackUrls);
-                video.dataset.fallbackIndex = '0';
-            }
-            
-            // Set src - don't force load, let browser handle it naturally
-            video.src = videoUrl;
-            
-            // Add crossOrigin attribute for CORS (may help with v.redd.it)
-            video.crossOrigin = 'anonymous';
-            
-            // Don't force load immediately - may be causing CORS/loading issues
-            // video.load(); // Commented out - let browser handle loading
-            
-            // Store URL for reuse in viewer (store original URL, not converted)
-            video.dataset.mediaUrl = mediaUrl;
-            
-            // Error handling - if video fails, show thumbnail as clickable link to Reddit
-            video.onerror = (() => {
-                const actualSrc = video.src;
-                console.error('Grid Video/GIF load error - Element src:', actualSrc, 'Original mediaUrl:', mediaUrl, 'Error:', video.error);
+            // Use mediaUrl directly - Reddit provides working URLs
+            if (mediaUrl) {
+                video.src = mediaUrl;
+                video.dataset.mediaUrl = mediaUrl;
                 
-                // Show thumbnail as clickable link to Reddit post
-                const img = document.createElement('img');
-                const thumbnailUrl = this.getThumbnailUrl(post);
-                img.src = thumbnailUrl || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%231a1f2e" width="400" height="400"/%3E%3Ctext fill="%23b0b8c4" font-family="sans-serif" font-size="18" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EClick to view on Reddit%3C/text%3E%3C/svg%3E';
-                img.alt = post.title;
-                img.style.cursor = 'pointer';
-                img.title = 'Click to view on Reddit (video not available)';
-                img.onclick = () => {
-                    // Open Reddit post in new tab
-                    window.open(`https://reddit.com${post.permalink}`, '_blank');
+                // Try to load video on hover
+                let isHovering = false;
+                let loadTimeout;
+                
+                mediaWrapper.addEventListener('mouseenter', () => {
+                    isHovering = true;
+                    clearTimeout(loadTimeout);
+                    
+                    // Show video, hide thumbnail
+                    thumbnail.style.display = 'none';
+                    video.style.display = 'block';
+                    
+                    // Try to play
+                    const playPromise = video.play().catch(err => {
+                        // If play fails, show thumbnail
+                        if (isHovering) {
+                            video.style.display = 'none';
+                            thumbnail.style.display = 'block';
+                        }
+                    });
+                });
+                
+                mediaWrapper.addEventListener('mouseleave', () => {
+                    isHovering = false;
+                    video.pause();
+                    video.currentTime = 0;
+                    loadTimeout = setTimeout(() => {
+                        video.style.display = 'none';
+                        thumbnail.style.display = 'block';
+                    }, 100);
+                });
+                
+                // If video fails to load, just show thumbnail
+                video.onerror = () => {
+                    video.style.display = 'none';
+                    thumbnail.style.display = 'block';
                 };
-                if (video.parentNode) {
-                    video.parentNode.replaceChild(img, video);
-                }
-            });
+            } else {
+                // No video URL - just show thumbnail
+                video.style.display = 'none';
+            }
+            
+            mediaWrapper.appendChild(thumbnail);
+            if (mediaUrl) {
+                mediaWrapper.appendChild(video);
+            }
+            mediaContainer.appendChild(mediaWrapper);
             
             // Track play state to prevent race conditions
             let isPlaying = false;
@@ -835,8 +842,7 @@ class RedditViewer {
     getMediaUrl(post) {
         if (!post) return null;
         
-        // Simplified approach: Only return URLs that Reddit explicitly provides
-        // Don't try to construct or convert URLs - Reddit blocks them
+        // Get URLs that Reddit provides - prioritize working formats
         
         // Reddit video - check multiple possible locations (following API docs)
         if (post.is_video || post.domain === 'v.redd.it') {
