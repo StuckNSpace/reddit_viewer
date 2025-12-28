@@ -272,30 +272,54 @@ class RedditViewer {
         try {
             // Clean subreddit name (remove r/ if present)
             const cleanSubreddit = subreddit.replace(/^r\//, '').trim();
-            const url = `https://www.reddit.com/r/${encodeURIComponent(cleanSubreddit)}/hot.json?limit=25${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
+            
+            // Add raw_json=1 parameter for better compatibility and NSFW support
+            // Add allow_over18=1 to allow NSFW content
+            const url = `https://www.reddit.com/r/${encodeURIComponent(cleanSubreddit)}/hot.json?limit=25&raw_json=1&allow_over18=1${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
+            
+            console.log(`Fetching: ${url}`);
             
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
+                    'User-Agent': 'RedditViewer/1.0 (Web Browser)',
                 },
-                // Add credentials for better compatibility
                 mode: 'cors',
-                cache: 'no-cache'
+                cache: 'no-cache',
+                credentials: 'omit' // Don't send cookies, but might help with CORS
             });
+            
+            console.log(`Response status for r/${cleanSubreddit}:`, response.status, response.statusText);
             
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error(`Reddit API error for r/${cleanSubreddit}:`, response.status, errorText);
-                throw new Error(`Failed to load r/${cleanSubreddit}: ${response.status} ${response.statusText}`);
+                
+                // Handle specific error cases
+                if (response.status === 403) {
+                    throw new Error(`r/${cleanSubreddit} is private or requires authentication`);
+                } else if (response.status === 404) {
+                    throw new Error(`r/${cleanSubreddit} not found`);
+                } else if (response.status === 429) {
+                    throw new Error(`Rate limited - please wait a moment`);
+                } else {
+                    throw new Error(`Failed to load r/${cleanSubreddit}: ${response.status} ${response.statusText}`);
+                }
             }
             
             const data = await response.json();
+            console.log(`Data received for r/${cleanSubreddit}:`, data.data?.children?.length || 0, 'posts');
             
             // Validate response structure
-            if (!data || !data.data || !data.data.children) {
-                console.error('Invalid Reddit API response:', data);
+            if (!data || !data.data) {
+                console.error('Invalid Reddit API response structure:', data);
                 throw new Error(`Invalid response from r/${cleanSubreddit}`);
+            }
+            
+            if (!data.data.children || !Array.isArray(data.data.children)) {
+                console.error('No children array in response:', data);
+                throw new Error(`No posts found in r/${cleanSubreddit}`);
             }
             
             if (this.currentAfter === null) {
@@ -303,7 +327,10 @@ class RedditViewer {
                 this.currentAfter = data.data.after;
             }
             
-            return data.data.children.map(child => child.data);
+            const posts = data.data.children.map(child => child.data).filter(post => post); // Filter out null posts
+            console.log(`Processed ${posts.length} posts from r/${cleanSubreddit}`);
+            
+            return posts;
         } catch (error) {
             console.error(`Error fetching r/${subreddit}:`, error);
             // Return empty array instead of throwing to allow other subreddits to load
@@ -343,6 +370,8 @@ class RedditViewer {
         // Progressive display - show content as it loads
         requestAnimationFrame(() => {
             const filtered = this.posts.filter(post => {
+                if (!post || !post.url) return false;
+                
                 const hasImage = this.isImage(post.url) || this.isGif(post.url);
                 const hasVideo = this.isVideo(post) || this.isRedditVideo(post);
                 
@@ -356,6 +385,8 @@ class RedditViewer {
                 return true;
             });
 
+            console.log(`Filtered ${filtered.length} media posts from ${this.posts.length} total`);
+
             // For progressive loading, don't shuffle yet - just show top content first
             // Shuffle will happen on final display
             this.filteredPosts = filtered;
@@ -364,6 +395,7 @@ class RedditViewer {
             const sortedFiltered = [...filtered].sort((a, b) => (b.score || 0) - (a.score || 0));
             const topPosts = sortedFiltered.slice(0, Math.min(50, sortedFiltered.length)); // Show first 50
             
+            console.log(`Displaying ${topPosts.length} top posts`);
             this.displayPosts(topPosts, true); // Append mode for progressive loading
         });
     }
