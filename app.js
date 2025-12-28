@@ -1101,49 +1101,36 @@ class RedditViewer {
                 }
             }, 8000);
         } else if (this.currentMediaIsVideo || isGif) {
-            // Use video element for MP4-converted GIFs and videos
-            console.log('Loading video/GIF:', mediaUrl, 'Type:', mediaType, 'IsGIF:', isGif);
-            
-            // Fix CMAF URLs to DASH format (CMAF doesn't work in browsers)
-            // getMediaUrl should already return DASH, but double-check here
-            let videoUrl = this.convertToDASH(mediaUrl);
-            if (videoUrl !== mediaUrl) {
-                console.log('Viewer: Converted URL to DASH:', mediaUrl, '->', videoUrl);
-            }
-            // Final safety check - if it still contains CMAF, force conversion
-            if (videoUrl.includes('CMAF')) {
-                console.warn('Viewer: CMAF still in URL after conversion! Forcing DASH:', videoUrl);
-                videoUrl = videoUrl.replace('/CMAF_', '/DASH_');
-                console.log('Viewer: Forced conversion result:', videoUrl);
-            }
-            
-            // For v.redd.it URLs, try HLS first (works better than DASH)
-            // If HLS not available, try multiple proxy approaches
-            if (videoUrl.includes('v.redd.it')) {
-                const post = this.filteredPosts[this.currentViewerIndex];
-                
-                // Try HLS URL first (if available) - HLS works better with proxies
-                if (post.media?.reddit_video?.hls_url) {
-                    const hlsUrl = post.media.reddit_video.hls_url;
-                    console.log('Viewer: Using HLS URL for v.redd.it:', hlsUrl);
-                    videoUrl = hlsUrl;
-                } else if (post.secure_media?.reddit_video?.hls_url) {
-                    const hlsUrl = post.secure_media.reddit_video.hls_url;
-                    console.log('Viewer: Using secure_media HLS URL for v.redd.it:', hlsUrl);
-                    videoUrl = hlsUrl;
-                } else {
-                    // No HLS available, try proxying DASH URL
-                    // Try multiple proxies in case one fails
-                    const proxies = [
-                        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(videoUrl)}`,
-                        `https://corsproxy.io/?${encodeURIComponent(videoUrl)}`,
-                        `https://api.allorigins.win/raw?url=${encodeURIComponent(videoUrl)}`
-                    ];
-                    console.log('Viewer: No HLS available, trying proxies for v.redd.it:', videoUrl);
-                    // Use first proxy, fallback handled by error handler
-                    videoUrl = proxies[0];
+            // Check if it's v.redd.it BEFORE trying to load (always blocked)
+            if (mediaUrl && mediaUrl.includes('v.redd.it')) {
+                console.warn('Viewer: v.redd.it URLs are blocked by Reddit, showing thumbnail only');
+                viewerVideo.classList.add('hidden');
+                const thumbnailUrl = this.getThumbnailUrl(post);
+                if (thumbnailUrl && viewerImage) {
+                    viewerImage.src = thumbnailUrl;
+                    viewerImage.classList.remove('hidden');
+                    viewerImage.classList.add('fade-in');
                 }
-            }
+                if (mediaContainer) {
+                    mediaContainer.classList.remove('loading');
+                }
+                // Continue to slideshow logic below
+            } else {
+                // Use video element for MP4-converted GIFs and videos (non-v.redd.it)
+                console.log('Loading video/GIF:', mediaUrl, 'Type:', mediaType, 'IsGIF:', isGif);
+                
+                // Fix CMAF URLs to DASH format (CMAF doesn't work in browsers)
+                // getMediaUrl should already return DASH, but double-check here
+                let videoUrl = this.convertToDASH(mediaUrl);
+                if (videoUrl !== mediaUrl) {
+                    console.log('Viewer: Converted URL to DASH:', mediaUrl, '->', videoUrl);
+                }
+                // Final safety check - if it still contains CMAF, force conversion
+                if (videoUrl.includes('CMAF')) {
+                    console.warn('Viewer: CMAF still in URL after conversion! Forcing DASH:', videoUrl);
+                    videoUrl = videoUrl.replace('/CMAF_', '/DASH_');
+                    console.log('Viewer: Forced conversion result:', videoUrl);
+                }
             
             // Set attributes before setting src to ensure proper loading
             viewerVideo.muted = true;
