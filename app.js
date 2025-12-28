@@ -275,40 +275,67 @@ class RedditViewer {
             const redditUrl = `https://www.reddit.com/r/${cleanSubreddit}/hot.json?limit=25&raw_json=1${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
             
             // Try multiple CORS proxies for reliability
+            // Use /get endpoint which has proper CORS headers, not /raw
             const proxies = [
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(redditUrl)}`,
-                `https://corsproxy.io/?${encodeURIComponent(redditUrl)}`,
-                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(redditUrl)}`
+                {
+                    url: `https://api.allorigins.win/get?url=${encodeURIComponent(redditUrl)}`,
+                    parser: (responseData) => {
+                        // allorigins.win /get returns {contents: "..."} where contents is the JSON string
+                        if (responseData.contents) {
+                            return JSON.parse(responseData.contents);
+                        }
+                        return responseData;
+                    }
+                },
+                {
+                    url: `https://corsproxy.io/?${encodeURIComponent(redditUrl)}`,
+                    parser: (responseData) => responseData
+                },
+                {
+                    url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(redditUrl)}`,
+                    parser: (responseData) => responseData
+                },
+                {
+                    url: `https://cors-anywhere.herokuapp.com/${redditUrl}`,
+                    parser: (responseData) => responseData
+                }
             ];
             
             let data = null;
             let lastError = null;
             
-            for (const proxyUrl of proxies) {
+            for (const proxy of proxies) {
                 try {
-                    const response = await fetch(proxyUrl);
+                    const response = await fetch(proxy.url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                        mode: 'cors'
+                    });
                     
                     if (!response.ok) {
                         continue; // Try next proxy
                     }
                     
                     // Check if response is JSON
-                    const contentType = response.headers.get('content-type');
-                    if (contentType && !contentType.includes('application/json')) {
+                    const contentType = response.headers.get('content-type') || '';
+                    if (!contentType.includes('application/json') && !contentType.includes('text/plain')) {
                         // Might be HTML error page, try next proxy
                         const text = await response.text();
                         if (text.trim().startsWith('<')) {
                             continue; // HTML response, try next proxy
                         }
-                    }
-                    
-                    // Try to parse as JSON
-                    const responseText = await response.text();
-                    try {
-                        data = JSON.parse(responseText);
-                    } catch (parseError) {
-                        // Not valid JSON, try next proxy
-                        continue;
+                        // Try to parse anyway
+                        try {
+                            data = JSON.parse(text);
+                        } catch {
+                            continue;
+                        }
+                    } else {
+                        // Try to parse as JSON
+                        const responseData = await response.json();
+                        data = proxy.parser(responseData);
                     }
                     
                     // Validate it's Reddit data structure
