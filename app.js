@@ -616,6 +616,13 @@ class RedditViewer {
             video.playsInline = true;
             video.preload = 'auto'; // Preload full video for faster display
             
+            // For GIFs, preload more aggressively
+            if (mediaType === 'gif') {
+                video.preload = 'auto';
+                // Start loading immediately
+                video.load();
+            }
+            
             // Add poster/thumbnail for faster initial display
             const thumbnailUrl = this.getThumbnailUrl(post);
             if (thumbnailUrl) {
@@ -1002,8 +1009,11 @@ class RedditViewer {
             // Use video element for MP4-converted GIFs and videos
             console.log('Loading video/GIF:', mediaUrl, 'Type:', mediaType, 'IsGIF:', isGif);
             
-            viewerVideo.src = mediaUrl;
+            // Set attributes before setting src to ensure proper loading
             viewerVideo.muted = true;
+            viewerVideo.playsInline = true;
+            viewerVideo.controls = true; // Always show controls
+            viewerVideo.preload = 'auto'; // Preload for faster playback
             
             // GIFs always loop and auto-play, videos loop only in manual mode
             if (isGif) {
@@ -1014,9 +1024,6 @@ class RedditViewer {
                 viewerVideo.autoplay = false; // Videos only play in auto-play mode
             }
             
-            viewerVideo.playsInline = true;
-            viewerVideo.controls = true; // Always show controls
-            viewerVideo.preload = 'auto'; // Preload for faster playback
             viewerVideo.classList.remove('hidden');
             
             // Clean up old handlers
@@ -1028,6 +1035,10 @@ class RedditViewer {
             if (this.videoEndedHandler) {
                 viewerVideo.removeEventListener('ended', this.videoEndedHandler);
             }
+            
+            // Set src and load - this must happen after setting attributes
+            viewerVideo.src = mediaUrl;
+            viewerVideo.load(); // Explicitly call load() to start loading
             
             // Set up timeout to remove loading state if video takes too long
             let loadingTimeout = setTimeout(() => {
