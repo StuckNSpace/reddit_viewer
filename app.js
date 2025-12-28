@@ -274,11 +274,11 @@ class RedditViewer {
             const cleanSubreddit = subreddit.replace(/^r\//, '').trim();
             const redditUrl = `https://www.reddit.com/r/${cleanSubreddit}/hot.json?limit=25&raw_json=1${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
             
-            // Use Vercel serverless function as primary proxy (most reliable)
-            // Fallback to public proxies if serverless function fails
+            // Try multiple CORS proxies for reliability
+            // Skip Vercel serverless function (getting 403s) and use public proxies
             const proxies = [
                 {
-                    url: `/api/proxy?url=${encodeURIComponent(redditUrl)}`,
+                    url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(redditUrl)}`,
                     parser: (responseData) => responseData
                 },
                 {
@@ -286,8 +286,18 @@ class RedditViewer {
                     parser: (responseData) => responseData
                 },
                 {
-                    url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(redditUrl)}`,
-                    parser: (responseData) => responseData
+                    url: `https://api.allorigins.win/get?url=${encodeURIComponent(redditUrl)}`,
+                    parser: (responseData) => {
+                        // allorigins.win /get returns {contents: "..."} where contents is the JSON string
+                        if (responseData.contents) {
+                            try {
+                                return JSON.parse(responseData.contents);
+                            } catch (e) {
+                                return responseData;
+                            }
+                        }
+                        return responseData;
+                    }
                 }
             ];
             
