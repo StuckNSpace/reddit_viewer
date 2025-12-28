@@ -273,42 +273,64 @@ class RedditViewer {
             // Clean subreddit name (remove r/ if present)
             const cleanSubreddit = subreddit.replace(/^r\//, '').trim();
             
-            // Add raw_json=1 parameter for better compatibility and NSFW support
-            // Add allow_over18=1 to allow NSFW content
-            const url = `https://www.reddit.com/r/${encodeURIComponent(cleanSubreddit)}/hot.json?limit=25&raw_json=1&allow_over18=1${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
+            // Reddit API URL
+            const redditUrl = `https://www.reddit.com/r/${encodeURIComponent(cleanSubreddit)}/hot.json?limit=25&raw_json=1${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
             
-            console.log(`Fetching: ${url}`);
+            // Use CORS proxy to bypass CORS restrictions
+            // Try multiple proxy services for reliability
+            const proxyUrls = [
+                `https://api.allorigins.win/get?url=${encodeURIComponent(redditUrl)}`,
+                `https://corsproxy.io/?${encodeURIComponent(redditUrl)}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(redditUrl)}`
+            ];
             
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'User-Agent': 'RedditViewer/1.0 (Web Browser)',
-                },
-                mode: 'cors',
-                cache: 'no-cache',
-                credentials: 'omit' // Don't send cookies, but might help with CORS
-            });
+            let response = null;
+            let lastError = null;
             
-            console.log(`Response status for r/${cleanSubreddit}:`, response.status, response.statusText);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`Reddit API error for r/${cleanSubreddit}:`, response.status, errorText);
-                
-                // Handle specific error cases
-                if (response.status === 403) {
-                    throw new Error(`r/${cleanSubreddit} is private or requires authentication`);
-                } else if (response.status === 404) {
-                    throw new Error(`r/${cleanSubreddit} not found`);
-                } else if (response.status === 429) {
-                    throw new Error(`Rate limited - please wait a moment`);
-                } else {
-                    throw new Error(`Failed to load r/${cleanSubreddit}: ${response.status} ${response.statusText}`);
+            // Try each proxy until one works
+            for (const proxyUrl of proxyUrls) {
+                try {
+                    console.log(`Trying proxy: ${proxyUrl.substring(0, 50)}...`);
+                    response = await fetch(proxyUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                        mode: 'cors',
+                        cache: 'no-cache'
+                    });
+                    
+                    if (response.ok) {
+                        console.log(`Proxy success for r/${cleanSubreddit}`);
+                        break;
+                    }
+                } catch (err) {
+                    console.log(`Proxy failed, trying next...`);
+                    lastError = err;
+                    response = null;
                 }
             }
             
-            const data = await response.json();
+            if (!response || !response.ok) {
+                throw new Error(`All CORS proxies failed for r/${cleanSubreddit}`);
+            }
+            
+            let data = await response.json();
+            
+            // Handle different proxy response formats
+            if (data.contents) {
+                // allorigins.win format
+                try {
+                    data = JSON.parse(data.contents);
+                } catch (e) {
+                    console.error('Failed to parse proxy response:', e);
+                    throw new Error(`Invalid response from proxy for r/${cleanSubreddit}`);
+                }
+            } else if (data.status && data.status.http_code !== 200) {
+                // codetabs proxy error format
+                throw new Error(`Proxy error for r/${cleanSubreddit}: ${data.status.http_code}`);
+            }
+            
             console.log(`Data received for r/${cleanSubreddit}:`, data.data?.children?.length || 0, 'posts');
             
             // Validate response structure
