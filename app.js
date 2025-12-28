@@ -819,10 +819,28 @@ class RedditViewer {
         
         // Try to construct DASH URL from CMAF URL if we have one
         // CMAF URLs like v.redd.it/xxx/CMAF_1080.mp4 should use DASH format
-        if (post.url && post.url.includes('v.redd.it') && post.url.includes('CMAF')) {
-            // Convert CMAF to DASH format: v.redd.it/xxx/CMAF_1080.mp4 -> v.redd.it/xxx/DASH_1080.mp4
-            const dashUrl = post.url.replace('/CMAF_', '/DASH_');
-            return dashUrl;
+        // But first, try to get the actual video ID and construct proper DASH URL
+        if (post.url && post.url.includes('v.redd.it')) {
+            // Extract video ID from URL (format: v.redd.it/VIDEO_ID/...)
+            const videoIdMatch = post.url.match(/v\.redd\.it\/([^\/]+)/);
+            if (videoIdMatch) {
+                const videoId = videoIdMatch[1];
+                // Try DASH_720 first (most common), then fall back to other qualities
+                const dashUrls = [
+                    `https://v.redd.it/${videoId}/DASH_720.mp4`,
+                    `https://v.redd.it/${videoId}/DASH_480.mp4`,
+                    `https://v.redd.it/${videoId}/DASH_360.mp4`,
+                    `https://v.redd.it/${videoId}/DASH_1080.mp4`,
+                ];
+                // Return first available (we'll let the browser try them)
+                return dashUrls[0]; // Start with 720p
+            }
+            
+            // Fallback: convert CMAF to DASH if URL contains CMAF
+            if (post.url.includes('CMAF')) {
+                const dashUrl = post.url.replace('/CMAF_', '/DASH_');
+                return dashUrl;
+            }
         }
 
         // For direct GIF URLs, use the URL directly
