@@ -770,7 +770,7 @@ class RedditViewer {
         
         // Reddit video - check multiple possible locations
         if (post.is_video || post.domain === 'v.redd.it') {
-            // Try reddit_video fallback_url first
+            // Try reddit_video fallback_url first (this is the DASH URL, not CMAF)
             if (post.media?.reddit_video?.fallback_url) {
                 return post.media.reddit_video.fallback_url;
             }
@@ -781,6 +781,10 @@ class RedditViewer {
             // Try crosspost parent
             if (post.crosspost_parent_list?.[0]?.media?.reddit_video?.fallback_url) {
                 return post.crosspost_parent_list[0].media.reddit_video.fallback_url;
+            }
+            // Try HLS URL if available
+            if (post.media?.reddit_video?.hls_url) {
+                return post.media.reddit_video.hls_url;
             }
         }
 
@@ -801,8 +805,17 @@ class RedditViewer {
         }
         
         // For GIFs that Reddit converted to MP4, check for reddit_video_preview
+        // Use DASH URL (fallback_url) instead of CMAF if available
         if (post.preview?.reddit_video_preview?.fallback_url) {
             return post.preview.reddit_video_preview.fallback_url;
+        }
+        
+        // Try to construct DASH URL from CMAF URL if we have one
+        // CMAF URLs like v.redd.it/xxx/CMAF_1080.mp4 should use DASH format
+        if (post.url && post.url.includes('v.redd.it') && post.url.includes('CMAF')) {
+            // Convert CMAF to DASH format: v.redd.it/xxx/CMAF_1080.mp4 -> v.redd.it/xxx/DASH_1080.mp4
+            const dashUrl = post.url.replace('/CMAF_', '/DASH_');
+            return dashUrl;
         }
 
         // For direct GIF URLs, use the URL directly
