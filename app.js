@@ -272,18 +272,60 @@ class RedditViewer {
         try {
             // Clean subreddit name (remove r/ if present)
             const cleanSubreddit = subreddit.replace(/^r\//, '').trim();
-            const redditUrl = `https://www.reddit.com/r/${cleanSubreddit}/hot.json?limit=25${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
+            const redditUrl = `https://www.reddit.com/r/${cleanSubreddit}/hot.json?limit=25&raw_json=1${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
             
-            // Use CORS proxy - Reddit blocks direct browser requests
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(redditUrl)}`;
+            // Try multiple CORS proxies for reliability
+            const proxies = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(redditUrl)}`,
+                `https://corsproxy.io/?${encodeURIComponent(redditUrl)}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(redditUrl)}`
+            ];
             
-            const response = await fetch(proxyUrl);
+            let data = null;
+            let lastError = null;
             
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            for (const proxyUrl of proxies) {
+                try {
+                    const response = await fetch(proxyUrl);
+                    
+                    if (!response.ok) {
+                        continue; // Try next proxy
+                    }
+                    
+                    // Check if response is JSON
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && !contentType.includes('application/json')) {
+                        // Might be HTML error page, try next proxy
+                        const text = await response.text();
+                        if (text.trim().startsWith('<')) {
+                            continue; // HTML response, try next proxy
+                        }
+                    }
+                    
+                    // Try to parse as JSON
+                    const responseText = await response.text();
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseError) {
+                        // Not valid JSON, try next proxy
+                        continue;
+                    }
+                    
+                    // Validate it's Reddit data structure
+                    if (data && data.data && data.data.children) {
+                        break; // Success!
+                    } else {
+                        continue; // Wrong structure, try next proxy
+                    }
+                } catch (err) {
+                    lastError = err;
+                    continue; // Try next proxy
+                }
             }
             
-            const data = await response.json();
+            if (!data || !data.data || !data.data.children) {
+                throw new Error(`All proxies failed for r/${cleanSubreddit}${lastError ? ': ' + lastError.message : ''}`);
+            }
             
             if (this.currentAfter === null) {
                 // Only update after token on first load
