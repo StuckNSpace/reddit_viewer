@@ -1159,6 +1159,13 @@ class RedditViewer {
                 console.log('Viewer: Forced conversion result:', videoUrl);
             }
             
+            // If it's v.redd.it, proxy it due to Access Denied errors
+            if (videoUrl.includes('v.redd.it')) {
+                const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(videoUrl)}`;
+                console.log('Viewer: Proxying v.redd.it URL:', videoUrl, '->', proxyUrl);
+                videoUrl = proxyUrl;
+            }
+            
             // Set attributes before setting src to ensure proper loading
             viewerVideo.muted = true;
             viewerVideo.playsInline = true;
