@@ -636,20 +636,17 @@ class RedditViewer {
             video.preload = 'metadata';
             video.poster = thumbnailUrl;
             
-            // Use mediaUrl - if it's v.redd.it, we need to proxy it due to Access Denied
+            // Use mediaUrl - v.redd.it URLs are blocked, so we'll just show thumbnails
+            // Videos will play in the viewer where we can try different approaches
             if (mediaUrl) {
-                // Check if URL needs proxying (v.redd.it URLs are blocked)
-                let videoUrl = mediaUrl;
-                if (mediaUrl.includes('v.redd.it')) {
-                    // Try to proxy through CORS proxy
-                    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(mediaUrl)}`;
-                    videoUrl = proxyUrl;
-                    console.log('Grid: Proxying v.redd.it URL:', mediaUrl, '->', proxyUrl);
-                }
-                
-                video.src = videoUrl;
+                // Store the original URL but don't try to load it in grid (Access Denied)
+                // We'll only show thumbnails in grid, videos play in viewer
                 video.dataset.mediaUrl = mediaUrl;
-                video.dataset.originalUrl = mediaUrl; // Store original for viewer
+                video.dataset.originalUrl = mediaUrl;
+                
+                // Don't set src in grid - videos are blocked by Reddit
+                // User can click to view in fullscreen where we'll try HLS/proxy
+                video.style.display = 'none';
                 
                 // Try to load video on hover
                 let isHovering = false;
@@ -1159,11 +1156,32 @@ class RedditViewer {
                 console.log('Viewer: Forced conversion result:', videoUrl);
             }
             
-            // If it's v.redd.it, proxy it due to Access Denied errors
+            // For v.redd.it URLs, try HLS first (works better than DASH)
+            // If HLS not available, try multiple proxy approaches
             if (videoUrl.includes('v.redd.it')) {
-                const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(videoUrl)}`;
-                console.log('Viewer: Proxying v.redd.it URL:', videoUrl, '->', proxyUrl);
-                videoUrl = proxyUrl;
+                const post = this.filteredPosts[this.currentViewerIndex];
+                
+                // Try HLS URL first (if available) - HLS works better with proxies
+                if (post.media?.reddit_video?.hls_url) {
+                    const hlsUrl = post.media.reddit_video.hls_url;
+                    console.log('Viewer: Using HLS URL for v.redd.it:', hlsUrl);
+                    videoUrl = hlsUrl;
+                } else if (post.secure_media?.reddit_video?.hls_url) {
+                    const hlsUrl = post.secure_media.reddit_video.hls_url;
+                    console.log('Viewer: Using secure_media HLS URL for v.redd.it:', hlsUrl);
+                    videoUrl = hlsUrl;
+                } else {
+                    // No HLS available, try proxying DASH URL
+                    // Try multiple proxies in case one fails
+                    const proxies = [
+                        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(videoUrl)}`,
+                        `https://corsproxy.io/?${encodeURIComponent(videoUrl)}`,
+                        `https://api.allorigins.win/raw?url=${encodeURIComponent(videoUrl)}`
+                    ];
+                    console.log('Viewer: No HLS available, trying proxies for v.redd.it:', videoUrl);
+                    // Use first proxy, fallback handled by error handler
+                    videoUrl = proxies[0];
+                }
             }
             
             // Set attributes before setting src to ensure proper loading
