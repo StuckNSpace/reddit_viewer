@@ -626,6 +626,15 @@ class RedditViewer {
             // Fix CMAF URLs to DASH format (CMAF doesn't work in browsers)
             // getMediaUrl should already return DASH, but double-check here
             let videoUrl = this.convertToDASH(mediaUrl);
+            if (videoUrl !== mediaUrl) {
+                console.log('Grid: Converted URL to DASH:', mediaUrl, '->', videoUrl);
+            }
+            // Final safety check - if it still contains CMAF, force conversion
+            if (videoUrl.includes('CMAF')) {
+                console.warn('Grid: CMAF still in URL after conversion! Forcing DASH:', videoUrl);
+                videoUrl = videoUrl.replace('/CMAF_', '/DASH_');
+                console.log('Grid: Forced conversion result:', videoUrl);
+            }
             
             // Set src and load immediately - this preloads the video when post is displayed
             video.src = videoUrl;
