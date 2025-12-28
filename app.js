@@ -972,12 +972,24 @@ class RedditViewer {
             }
             
             viewerVideo.load(); // Reload video
-            viewerVideo.play().catch(err => {
-                // Ignore AbortError and NotAllowedError - these are expected
-                if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
-                    console.log('Video/GIF play failed:', err);
-                }
-            });
+            
+            // Play video after it's loaded
+            const playVideo = () => {
+                viewerVideo.play().catch(err => {
+                    // Ignore AbortError and NotAllowedError - these are expected
+                    if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
+                        console.log('Video/GIF play failed:', err);
+                    }
+                });
+            };
+            
+            if (viewerVideo.readyState >= 2) {
+                // Video already loaded
+                playVideo();
+            } else {
+                // Wait for video to load
+                viewerVideo.addEventListener('loadeddata', playVideo, { once: true });
+            }
         } else {
             viewerImage.src = mediaUrl;
             viewerImage.classList.remove('hidden');
@@ -1058,7 +1070,10 @@ class RedditViewer {
     startSlideshow() {
         this.stopSlideshow();
         this.isSlideshowPlaying = true;
-        document.getElementById('playPauseIcon').textContent = '⏸';
+        const playPauseIcon = document.getElementById('playPauseIcon');
+        if (playPauseIcon) {
+            playPauseIcon.textContent = '⏸';
+        }
         
         // For images, use time-based slideshow
         // For videos/GIFs, advancement is handled by loop count tracking or ended event
