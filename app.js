@@ -272,9 +272,12 @@ class RedditViewer {
         try {
             // Clean subreddit name (remove r/ if present)
             const cleanSubreddit = subreddit.replace(/^r\//, '').trim();
-            const url = `https://www.reddit.com/r/${cleanSubreddit}/hot.json?limit=25${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
+            const redditUrl = `https://www.reddit.com/r/${cleanSubreddit}/hot.json?limit=25${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
             
-            const response = await fetch(url);
+            // Use CORS proxy - Reddit blocks direct browser requests
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(redditUrl)}`;
+            
+            const response = await fetch(proxyUrl);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
