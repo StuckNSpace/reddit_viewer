@@ -636,10 +636,20 @@ class RedditViewer {
             video.preload = 'metadata';
             video.poster = thumbnailUrl;
             
-            // Use mediaUrl directly - Reddit provides working URLs
+            // Use mediaUrl - if it's v.redd.it, we need to proxy it due to Access Denied
             if (mediaUrl) {
-                video.src = mediaUrl;
+                // Check if URL needs proxying (v.redd.it URLs are blocked)
+                let videoUrl = mediaUrl;
+                if (mediaUrl.includes('v.redd.it')) {
+                    // Try to proxy through CORS proxy
+                    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(mediaUrl)}`;
+                    videoUrl = proxyUrl;
+                    console.log('Grid: Proxying v.redd.it URL:', mediaUrl, '->', proxyUrl);
+                }
+                
+                video.src = videoUrl;
                 video.dataset.mediaUrl = mediaUrl;
+                video.dataset.originalUrl = mediaUrl; // Store original for viewer
                 
                 // Try to load video on hover
                 let isHovering = false;
@@ -675,6 +685,7 @@ class RedditViewer {
                 
                 // If video fails to load, just show thumbnail
                 video.onerror = () => {
+                    console.warn('Grid: Video failed to load, showing thumbnail:', mediaUrl);
                     video.style.display = 'none';
                     thumbnail.style.display = 'block';
                 };
