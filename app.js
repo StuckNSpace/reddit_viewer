@@ -996,8 +996,28 @@ class RedditViewer {
                 viewerVideo.removeEventListener('ended', this.videoEndedHandler);
             }
             
-            // Set up event handlers before loading
+            // Set up timeout to remove loading state if video takes too long
+            let loadingTimeout = setTimeout(() => {
+                if (mediaContainer && mediaContainer.classList.contains('loading')) {
+                    console.warn('Video/GIF loading timeout, removing loading state');
+                    mediaContainer.classList.remove('loading');
+                    // Try to play anyway if we have some data
+                    if (isGif && viewerVideo.readyState >= 2) {
+                        viewerVideo.play().catch(() => {});
+                    }
+                }
+            }, 8000); // 8 second timeout
+            
+            const clearLoadingTimeout = () => {
+                if (loadingTimeout) {
+                    clearTimeout(loadingTimeout);
+                    loadingTimeout = null;
+                }
+            };
+            
             const handleVideoReady = () => {
+                clearLoadingTimeout();
+                
                 if (mediaContainer) {
                     mediaContainer.classList.remove('loading');
                 }
@@ -1044,50 +1064,25 @@ class RedditViewer {
             };
             
             const handleVideoError = (e) => {
+                clearLoadingTimeout();
+                
                 if (mediaContainer) {
                     mediaContainer.classList.remove('loading');
                 }
                 console.error('Failed to load video/GIF:', mediaUrl, 'Type:', mediaType, 'Error:', e);
-                // Try to show error or fallback
-            };
-            
-            const handleVideoLoadStart = () => {
-                // Video started loading
-                console.log('Video/GIF loading started:', mediaUrl);
             };
             
             // Add event listeners
-            viewerVideo.addEventListener('loadstart', handleVideoLoadStart, { once: true });
             viewerVideo.addEventListener('loadeddata', handleVideoReady, { once: true });
             viewerVideo.addEventListener('canplay', handleVideoReady, { once: true });
             viewerVideo.addEventListener('canplaythrough', handleVideoReady, { once: true });
             viewerVideo.addEventListener('error', handleVideoError, { once: true });
-            
-            // Set timeout to remove loading state if video takes too long
-            const loadingTimeout = setTimeout(() => {
-                if (mediaContainer && mediaContainer.classList.contains('loading')) {
-                    console.warn('Video/GIF loading timeout, removing loading state');
-                    mediaContainer.classList.remove('loading');
-                    // Try to play anyway
-                    if (isGif && viewerVideo.readyState >= 2) {
-                        viewerVideo.play().catch(() => {});
-                    }
-                }
-            }, 10000); // 10 second timeout
-            
-            // Clear timeout when video loads
-            const originalHandleReady = handleVideoReady;
-            handleVideoReady = () => {
-                clearTimeout(loadingTimeout);
-                originalHandleReady();
-            };
             
             // Load video
             viewerVideo.load();
             
             // Also try to play immediately if already loaded
             if (viewerVideo.readyState >= 2) {
-                clearTimeout(loadingTimeout);
                 handleVideoReady();
             }
         } else {
