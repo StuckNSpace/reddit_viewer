@@ -637,55 +637,16 @@ class RedditViewer {
             video.poster = thumbnailUrl;
             
             // Use mediaUrl - v.redd.it URLs are blocked, so we'll just show thumbnails
-            // Videos will play in the viewer where we can try different approaches
+            // Videos will play in the viewer where we can try HLS/proxy
             if (mediaUrl) {
                 // Store the original URL but don't try to load it in grid (Access Denied)
                 // We'll only show thumbnails in grid, videos play in viewer
                 video.dataset.mediaUrl = mediaUrl;
                 video.dataset.originalUrl = mediaUrl;
                 
-                // Don't set src in grid - videos are blocked by Reddit
+                // Don't set src in grid - v.redd.it videos are blocked by Reddit
                 // User can click to view in fullscreen where we'll try HLS/proxy
                 video.style.display = 'none';
-                
-                // Try to load video on hover
-                let isHovering = false;
-                let loadTimeout;
-                
-                mediaWrapper.addEventListener('mouseenter', () => {
-                    isHovering = true;
-                    clearTimeout(loadTimeout);
-                    
-                    // Show video, hide thumbnail
-                    thumbnail.style.display = 'none';
-                    video.style.display = 'block';
-                    
-                    // Try to play
-                    const playPromise = video.play().catch(err => {
-                        // If play fails, show thumbnail
-                        if (isHovering) {
-                            video.style.display = 'none';
-                            thumbnail.style.display = 'block';
-                        }
-                    });
-                });
-                
-                mediaWrapper.addEventListener('mouseleave', () => {
-                    isHovering = false;
-                    video.pause();
-                    video.currentTime = 0;
-                    loadTimeout = setTimeout(() => {
-                        video.style.display = 'none';
-                        thumbnail.style.display = 'block';
-                    }, 100);
-                });
-                
-                // If video fails to load, just show thumbnail
-                video.onerror = () => {
-                    console.warn('Grid: Video failed to load, showing thumbnail:', mediaUrl);
-                    video.style.display = 'none';
-                    thumbnail.style.display = 'block';
-                };
             } else {
                 // No video URL - just show thumbnail
                 video.style.display = 'none';
