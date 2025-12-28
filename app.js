@@ -801,11 +801,23 @@ class RedditViewer {
             const videoIdMatch = url.match(/v\.redd\.it\/([^\/]+)/);
             if (videoIdMatch) {
                 const videoId = videoIdMatch[1];
-                return `https://v.redd.it/${videoId}/DASH_720.mp4`;
+                // Use 480p as default (most reliable)
+                return `https://v.redd.it/${videoId}/DASH_480.mp4`;
             }
         }
         
         return url;
+    }
+    
+    // Get fallback URLs for a video ID (try different qualities)
+    getVideoFallbackUrls(videoId) {
+        return [
+            `https://v.redd.it/${videoId}/DASH_480.mp4`,  // Most reliable
+            `https://v.redd.it/${videoId}/DASH_720.mp4`,
+            `https://v.redd.it/${videoId}/DASH_360.mp4`,
+            `https://v.redd.it/${videoId}/DASH_240.mp4`,
+            `https://v.redd.it/${videoId}/DASH_1080.mp4`, // Try 1080p last
+        ];
     }
 
     getMediaUrl(post) {
