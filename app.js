@@ -1253,6 +1253,15 @@ class RedditViewer {
                 if (mediaContainer) {
                     mediaContainer.classList.remove('loading');
                 }
+                
+                // If video fails, try to show thumbnail as fallback
+                viewerVideo.classList.add('hidden');
+                const thumbnailUrl = this.getThumbnailUrl(post);
+                if (thumbnailUrl && viewerImage) {
+                    console.log('Viewer: Video failed, showing thumbnail:', thumbnailUrl);
+                    viewerImage.src = thumbnailUrl;
+                    viewerImage.classList.remove('hidden');
+                }
             };
             
             // Add event listeners with logging
