@@ -634,8 +634,9 @@ class RedditViewer {
             // Store URL for reuse in viewer (store original URL, not converted)
             video.dataset.mediaUrl = mediaUrl;
             
-            // Error handling
+            // Error handling - log the actual URL being used
             video.onerror = (() => {
+                console.error('Video/GIF load error:', videoUrl, 'Original:', mediaUrl);
                 const postUrl = post.url;
                 const postTitle = post.title;
                 return function() {
@@ -793,22 +794,31 @@ class RedditViewer {
     getMediaUrl(post) {
         if (!post) return '';
         
+        console.log('getMediaUrl called for post:', post.id, 'URL:', post.url);
+        
         // Reddit video - check multiple possible locations
         if (post.is_video || post.domain === 'v.redd.it') {
             // Try reddit_video fallback_url first (this is the DASH URL, not CMAF)
             if (post.media?.reddit_video?.fallback_url) {
-                return this.convertToDASH(post.media.reddit_video.fallback_url);
+                const url = this.convertToDASH(post.media.reddit_video.fallback_url);
+                console.log('getMediaUrl: Using media.reddit_video.fallback_url:', url);
+                return url;
             }
             // Try secure_media
             if (post.secure_media?.reddit_video?.fallback_url) {
-                return this.convertToDASH(post.secure_media.reddit_video.fallback_url);
+                const url = this.convertToDASH(post.secure_media.reddit_video.fallback_url);
+                console.log('getMediaUrl: Using secure_media.reddit_video.fallback_url:', url);
+                return url;
             }
             // Try crosspost parent
             if (post.crosspost_parent_list?.[0]?.media?.reddit_video?.fallback_url) {
-                return this.convertToDASH(post.crosspost_parent_list[0].media.reddit_video.fallback_url);
+                const url = this.convertToDASH(post.crosspost_parent_list[0].media.reddit_video.fallback_url);
+                console.log('getMediaUrl: Using crosspost reddit_video.fallback_url:', url);
+                return url;
             }
             // Try HLS URL if available
             if (post.media?.reddit_video?.hls_url) {
+                console.log('getMediaUrl: Using media.reddit_video.hls_url:', post.media.reddit_video.hls_url);
                 return post.media.reddit_video.hls_url;
             }
         }
@@ -816,7 +826,9 @@ class RedditViewer {
         // For GIFs that Reddit converted to MP4, check for reddit_video_preview FIRST
         // This gives us the DASH URL (fallback_url) which works in browsers
         if (post.preview?.reddit_video_preview?.fallback_url) {
-            return this.convertToDASH(post.preview.reddit_video_preview.fallback_url);
+            const url = this.convertToDASH(post.preview.reddit_video_preview.fallback_url);
+            console.log('getMediaUrl: Using preview.reddit_video_preview.fallback_url:', url);
+            return url;
         }
         
         // For animated GIFs/MP4s, check variants but convert CMAF to DASH
@@ -826,6 +838,7 @@ class RedditViewer {
             if (mp4Url.startsWith('http')) {
                 // ALWAYS convert CMAF to DASH - CMAF doesn't work in browsers
                 mp4Url = this.convertToDASH(mp4Url);
+                console.log('getMediaUrl: Using preview.images[0].variants.mp4.source.url:', mp4Url);
                 return mp4Url;
             }
         }
@@ -834,6 +847,7 @@ class RedditViewer {
             if (gifUrl.startsWith('http')) {
                 // ALWAYS convert CMAF to DASH
                 gifUrl = this.convertToDASH(gifUrl);
+                console.log('getMediaUrl: Using preview.images[0].variants.gif.source.url:', gifUrl);
                 return gifUrl;
             }
         }
@@ -841,13 +855,17 @@ class RedditViewer {
         // Try to construct DASH URL from v.redd.it URL
         if (post.url && post.url.includes('v.redd.it')) {
             // Extract video ID from URL (format: v.redd.it/VIDEO_ID/...)
-            const videoIdMatch = post.url.match(/v\.redd\.it\/([^\/]+)/);
+            const videoIdMatch = post.url.match(/v\.redd\.it\/([^\/\?]+)/);
             if (videoIdMatch) {
                 const videoId = videoIdMatch[1];
                 // Try DASH_720 first (most common and reliable)
-                return `https://v.redd.it/${videoId}/DASH_720.mp4`;
+                const dashUrl = `https://v.redd.it/${videoId}/DASH_720.mp4`;
+                console.log('getMediaUrl: Constructed DASH URL from post.url:', post.url, '->', dashUrl);
+                return dashUrl;
             }
         }
+        
+        console.warn('getMediaUrl: No media URL found for post:', post.id, post);
 
         // For direct GIF URLs, use the URL directly
         if (post.url && /\.gif$/i.test(post.url)) {
