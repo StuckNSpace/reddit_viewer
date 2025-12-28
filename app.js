@@ -526,7 +526,13 @@ class RedditViewer {
             video.muted = true;
             video.loop = true;
             video.playsInline = true;
-            video.preload = 'metadata';
+            video.preload = 'auto'; // Preload full video for faster display
+            
+            // Add poster/thumbnail for faster initial display
+            const thumbnailUrl = this.getThumbnailUrl(post);
+            if (thumbnailUrl) {
+                video.poster = thumbnailUrl;
+            }
             
             // Error handling
             video.onerror = (() => {
