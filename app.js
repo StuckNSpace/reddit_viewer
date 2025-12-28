@@ -1132,28 +1132,28 @@ class RedditViewer {
                     console.log('Viewer: Forced conversion result:', videoUrl);
                 }
             
-            // Set attributes before setting src to ensure proper loading
-            viewerVideo.muted = true;
-            viewerVideo.playsInline = true;
-            viewerVideo.controls = true; // Always show controls
-            viewerVideo.preload = 'auto'; // Preload for faster playback
-            
-            // GIFs always loop and auto-play, videos loop only in manual mode
-            if (isGif) {
-                viewerVideo.loop = true; // GIFs always loop
-                viewerVideo.autoplay = true; // GIFs should auto-play
-            } else {
-                viewerVideo.loop = this.isAutoPlayMode ? false : true; // Videos: no loop in auto-play mode
-                viewerVideo.autoplay = false; // Videos only play in auto-play mode
-            }
-            
-            // Set src and load - this must happen after setting attributes
-            viewerVideo.src = videoUrl;
-            viewerVideo.load(); // Explicitly call load() to start loading
-            
-            viewerVideo.classList.remove('hidden');
-            
-            // Clean up old handlers
+                // Set attributes before setting src to ensure proper loading
+                viewerVideo.muted = true;
+                viewerVideo.playsInline = true;
+                viewerVideo.controls = true; // Always show controls
+                viewerVideo.preload = 'auto'; // Preload for faster playback
+                
+                // GIFs always loop and auto-play, videos loop only in manual mode
+                if (isGif) {
+                    viewerVideo.loop = true; // GIFs always loop
+                    viewerVideo.autoplay = true; // GIFs should auto-play
+                } else {
+                    viewerVideo.loop = this.isAutoPlayMode ? false : true; // Videos: no loop in auto-play mode
+                    viewerVideo.autoplay = false; // Videos only play in auto-play mode
+                }
+                
+                // Set src and load - this must happen after setting attributes
+                viewerVideo.src = videoUrl;
+                viewerVideo.load(); // Explicitly call load() to start loading
+                
+                viewerVideo.classList.remove('hidden');
+                
+                // Clean up old handlers
             viewerVideo.onloadeddata = null;
             viewerVideo.oncanplay = null;
             viewerVideo.onerror = null;
