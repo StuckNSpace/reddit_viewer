@@ -749,6 +749,32 @@ class RedditViewer {
         return 'image';
     }
 
+    getThumbnailUrl(post) {
+        if (!post) return '';
+        
+        // Try preview thumbnail first (usually available)
+        if (post.preview?.images?.[0]?.source?.url) {
+            return post.preview.images[0].source.url.replace(/&amp;/g, '&');
+        }
+        
+        // Try resolutions (smaller, faster to load)
+        if (post.preview?.images?.[0]?.resolutions?.length > 0) {
+            const resolutions = post.preview.images[0].resolutions;
+            // Use a medium-sized resolution for poster
+            const mediumRes = resolutions[Math.floor(resolutions.length / 2)] || resolutions[resolutions.length - 1];
+            if (mediumRes?.url) {
+                return mediumRes.url.replace(/&amp;/g, '&');
+            }
+        }
+        
+        // Try thumbnail from post data
+        if (post.thumbnail && post.thumbnail !== 'self' && post.thumbnail !== 'default' && post.thumbnail !== 'nsfw') {
+            return post.thumbnail;
+        }
+        
+        return '';
+    }
+
     formatNumber(num) {
         if (num >= 1000000) {
             return (num / 1000000).toFixed(1) + 'M';
