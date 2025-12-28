@@ -499,6 +499,16 @@ header h1 {
     display: flex;
     align-items: center;
     justify-content: center;
+    animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 .viewer-modal.hidden {
@@ -511,8 +521,9 @@ header h1 {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.95);
-    backdrop-filter: blur(10px);
+    background: linear-gradient(135deg, rgba(15, 20, 25, 0.98) 0%, rgba(0, 0, 0, 0.98) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 .viewer-content {
@@ -524,56 +535,95 @@ header h1 {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 80px 20px 120px;
+    padding: 100px 40px 140px;
 }
 
 .viewer-media-container {
     flex: 1;
     width: 100%;
-    max-width: 1400px;
+    max-width: 1600px;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
+    min-height: 400px;
+}
+
+.viewer-media-container.loading::before {
+    content: '';
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255, 69, 0, 0.2);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 10;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .viewer-media {
     max-width: 100%;
-    max-height: calc(100vh - 200px);
+    max-height: calc(100vh - 250px);
+    width: auto;
+    height: auto;
     object-fit: contain;
-    border-radius: 8px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    animation: fadeIn 0.3s ease;
+    border-radius: 16px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    animation: mediaFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    background: transparent;
+}
+
+.viewer-media.fade-in {
+    animation: mediaFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes mediaFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
 }
 
 .viewer-media.hidden {
     display: none;
 }
 
-@keyframes fadeIn {
+.viewer-info {
+    margin-top: 40px;
+    text-align: center;
+    max-width: 900px;
+    padding: 0 30px;
+    animation: fadeInUp 0.5s ease 0.2s both;
+}
+
+@keyframes fadeInUp {
     from {
         opacity: 0;
-        transform: scale(0.95);
+        transform: translateY(20px);
     }
     to {
         opacity: 1;
-        transform: scale(1);
+        transform: translateY(0);
     }
 }
 
-.viewer-info {
-    margin-top: 30px;
-    text-align: center;
-    max-width: 800px;
-    padding: 0 20px;
-}
-
 .viewer-title {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 15px;
-    line-height: 1.4;
+    margin-bottom: 18px;
+    line-height: 1.5;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .viewer-meta {
@@ -605,29 +655,33 @@ header h1 {
 
 .viewer-close {
     position: absolute;
-    top: 20px;
-    right: 20px;
+    top: 30px;
+    right: 30px;
     z-index: 10001;
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.1);
     color: white;
-    font-size: 3rem;
-    width: 60px;
-    height: 60px;
+    font-size: 2.5rem;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s;
-    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     line-height: 1;
     padding: 0;
+    font-weight: 300;
 }
 
 .viewer-close:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: rotate(90deg);
+    background: rgba(255, 69, 0, 0.9);
+    border-color: var(--primary-color);
+    transform: rotate(90deg) scale(1.1);
+    box-shadow: 0 8px 24px rgba(255, 69, 0, 0.4);
 }
 
 .viewer-controls {
@@ -643,62 +697,80 @@ header h1 {
 }
 
 .viewer-nav-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid rgba(255, 255, 255, 0.15);
     color: white;
-    font-size: 4rem;
-    width: 70px;
-    height: 70px;
+    font-size: 3.5rem;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s;
-    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     pointer-events: all;
     line-height: 1;
     padding: 0;
+    font-weight: 300;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .viewer-nav-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: scale(1.1);
+    background: rgba(255, 69, 0, 0.9);
+    border-color: var(--primary-color);
+    transform: scale(1.15);
+    box-shadow: 0 12px 32px rgba(255, 69, 0, 0.5);
+}
+
+.viewer-nav-btn:active {
+    transform: scale(1.05);
 }
 
 .viewer-toolbar {
     position: absolute;
-    bottom: 30px;
+    bottom: 40px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 10001;
     display: flex;
     align-items: center;
-    gap: 20px;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 15px 25px;
+    gap: 16px;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 16px 28px;
     border-radius: 50px;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .viewer-toolbar-btn {
     background: rgba(255, 255, 255, 0.1);
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: white;
-    font-size: 1.5rem;
-    width: 45px;
-    height: 45px;
+    font-size: 1.4rem;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .viewer-toolbar-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: scale(1.1);
+    background: rgba(255, 69, 0, 0.9);
+    border-color: var(--primary-color);
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(255, 69, 0, 0.4);
+}
+
+.viewer-toolbar-btn:active {
+    transform: scale(1.05);
 }
 
 .slideshow-speed {
@@ -750,16 +822,20 @@ header h1 {
 
 .viewer-counter {
     position: absolute;
-    top: 20px;
-    left: 20px;
+    top: 30px;
+    left: 30px;
     z-index: 10001;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.75);
     color: white;
-    padding: 10px 20px;
-    border-radius: 25px;
+    padding: 12px 24px;
+    border-radius: 30px;
     font-size: 1rem;
     font-weight: 600;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    letter-spacing: 0.5px;
 }
 
 /* Fullscreen mode adjustments */

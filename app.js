@@ -484,6 +484,23 @@ class RedditViewer {
             return;
         }
 
+        // Toggle auto-play mode
+        if (this.isAutoPlayMode) {
+            // Stop auto-play mode
+            this.isAutoPlayMode = false;
+            this.stopSlideshow();
+            const autoPlayBtn = document.getElementById('autoPlayBtn');
+            autoPlayBtn.classList.remove('active');
+            autoPlayBtn.textContent = '▶ Auto-Play Mode';
+            
+            // If viewer is open, close it
+            if (!document.getElementById('viewerModal').classList.contains('hidden')) {
+                this.closeViewer();
+            }
+            return;
+        }
+
+        // Start auto-play mode
         this.isAutoPlayMode = true;
         this.targetLoopCount = 1; // Auto-advance after 1 play
         const autoPlayBtn = document.getElementById('autoPlayBtn');
@@ -493,16 +510,13 @@ class RedditViewer {
         // Start from first item or random
         const startIndex = this.isShuffled ? Math.floor(Math.random() * this.filteredPosts.length) : 0;
         
-        // Open viewer and start slideshow
+        // Open viewer with auto-start slideshow
         this.openViewer(startIndex, true);
         
-        // Start slideshow immediately
-        this.startSlideshow();
-        
-        // Auto-enter fullscreen
+        // Auto-enter fullscreen after a short delay
         setTimeout(() => {
             this.toggleFullscreen();
-        }, 500);
+        }, 800);
     }
 
     isImage(url) {
@@ -892,7 +906,7 @@ class RedditViewer {
         document.getElementById('error').classList.add('hidden');
     }
 
-    openViewer(index, autoStartSlideshow = true) {
+    openViewer(index, autoStartSlideshow = false) {
         if (index < 0 || index >= this.filteredPosts.length) return;
         
         this.currentViewerIndex = index;
@@ -900,6 +914,15 @@ class RedditViewer {
         const modal = document.getElementById('viewerModal');
         const viewerImage = document.getElementById('viewerImage');
         const viewerVideo = document.getElementById('viewerVideo');
+        const mediaContainer = document.querySelector('.viewer-media-container');
+        
+        // Show loading state
+        if (mediaContainer) {
+            mediaContainer.classList.add('loading');
+        }
+        
+        // Stop any existing slideshow
+        this.stopSlideshow();
         
         // Pause and reset current video if playing
         if (!viewerVideo.classList.contains('hidden')) {
@@ -916,6 +939,7 @@ class RedditViewer {
             }
         }
         
+        // Show modal immediately
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
         
@@ -930,94 +954,95 @@ class RedditViewer {
         viewerImage.classList.add('hidden');
         viewerVideo.classList.add('hidden');
         
-        if (this.currentMediaIsVideo) {
-            // Use video element for both videos and GIFs (since Reddit serves GIFs as MP4)
-            viewerVideo.src = mediaUrl;
-            viewerVideo.muted = true;
-            viewerVideo.loop = this.isAutoPlayMode ? false : true; // Don't loop in auto-play mode
-            viewerVideo.playsInline = true;
-            viewerVideo.controls = !this.isAutoPlayMode; // Hide controls in auto-play mode
-            viewerVideo.classList.remove('hidden');
-            
-            if (this.isAutoPlayMode) {
-                // In auto-play mode: advance when video ends
-                this.videoEndedHandler = () => {
-                    // Auto-advance when video ends in auto-play mode
-                    setTimeout(() => {
-                        if (this.isAutoPlayMode && this.isSlideshowPlaying) {
-                            this.navigateViewer(1);
-                        }
-                    }, 500);
-                };
-                viewerVideo.addEventListener('ended', this.videoEndedHandler);
-            } else {
-                // Normal mode: track video loops for slideshow
-                let lastTime = 0;
-                let nearEnd = false;
-                this.videoLoopHandler = () => {
-                    const currentTime = viewerVideo.currentTime;
-                    const duration = viewerVideo.duration;
-                    
-                    // Check if we're near the end (within 0.3 seconds)
-                    if (duration > 0 && currentTime >= duration - 0.3) {
-                        nearEnd = true;
-                    }
-                    
-                    // Detect when video loops back to beginning
-                    if (nearEnd && currentTime < 0.5 && lastTime > 0.5) {
-                        this.videoLoopCount++;
-                        nearEnd = false;
-                        // Advance slideshow after target number of loops
-                        if (this.videoLoopCount >= this.targetLoopCount && this.isSlideshowPlaying) {
-                            setTimeout(() => {
-                                if (this.isSlideshowPlaying) {
-                                    this.navigateViewer(1);
-                                }
-                            }, 100);
-                        }
-                    }
-                    lastTime = currentTime;
-                };
-                viewerVideo.addEventListener('timeupdate', this.videoLoopHandler);
-            }
-            
-            viewerVideo.load(); // Reload video
-            
-            // Play video after it's loaded
-            const playVideo = () => {
-                viewerVideo.play().catch(err => {
-                    // Ignore AbortError and NotAllowedError - these are expected
-                    if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
-                        console.log('Video/GIF play failed:', err);
-                    }
-                });
-            };
-            
-            if (viewerVideo.readyState >= 2) {
-                // Video already loaded
-                playVideo();
-            } else {
-                // Wait for video to load
-                viewerVideo.addEventListener('loadeddata', playVideo, { once: true });
-            }
-        } else {
-            viewerImage.src = mediaUrl;
-            viewerImage.classList.remove('hidden');
-        }
-        
-        // Update info
+        // Update info immediately
         document.getElementById('viewerTitle').textContent = post.title;
         document.getElementById('viewerSubreddit').textContent = `r/${post.subreddit}`;
         document.getElementById('viewerStats').innerHTML = `
             <span>⬆ ${this.formatNumber(post.ups)}</span>
             <span>💬 ${this.formatNumber(post.num_comments)}</span>
         `;
-        
-        // Update counter
         document.getElementById('viewerCounter').textContent = `${index + 1} / ${this.filteredPosts.length}`;
         
-        // Auto-start slideshow only if requested
-        if (autoStartSlideshow) {
+        if (this.currentMediaIsVideo) {
+            // Use video element for both videos and GIFs
+            viewerVideo.src = mediaUrl;
+            viewerVideo.muted = true;
+            viewerVideo.loop = this.isAutoPlayMode ? false : true;
+            viewerVideo.playsInline = true;
+            viewerVideo.controls = true; // Always show controls for manual control
+            viewerVideo.classList.remove('hidden');
+            
+            // Clean up old handlers
+            viewerVideo.onloadeddata = null;
+            viewerVideo.onerror = null;
+            
+            // Load and play video
+            viewerVideo.load();
+            
+            const handleVideoLoad = () => {
+                if (mediaContainer) {
+                    mediaContainer.classList.remove('loading');
+                }
+                viewerVideo.classList.add('fade-in');
+                
+                // Only auto-play if in auto-play mode
+                if (this.isAutoPlayMode) {
+                    viewerVideo.play().catch(err => {
+                        if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
+                            console.log('Video play failed:', err);
+                        }
+                    });
+                    
+                    // Set up auto-advance handler
+                    this.videoEndedHandler = () => {
+                        if (this.isAutoPlayMode && this.isSlideshowPlaying) {
+                            setTimeout(() => this.navigateViewer(1), 500);
+                        }
+                    };
+                    viewerVideo.addEventListener('ended', this.videoEndedHandler, { once: true });
+                }
+            };
+            
+            const handleVideoError = () => {
+                if (mediaContainer) {
+                    mediaContainer.classList.remove('loading');
+                }
+                console.error('Failed to load video:', mediaUrl);
+            };
+            
+            if (viewerVideo.readyState >= 2) {
+                handleVideoLoad();
+            } else {
+                viewerVideo.addEventListener('loadeddata', handleVideoLoad, { once: true });
+                viewerVideo.addEventListener('error', handleVideoError, { once: true });
+            }
+        } else {
+            // Image
+            viewerImage.src = '';
+            viewerImage.classList.add('hidden');
+            
+            const handleImageLoad = () => {
+                if (mediaContainer) {
+                    mediaContainer.classList.remove('loading');
+                }
+                viewerImage.classList.remove('hidden');
+                viewerImage.classList.add('fade-in');
+            };
+            
+            const handleImageError = () => {
+                if (mediaContainer) {
+                    mediaContainer.classList.remove('loading');
+                }
+                console.error('Failed to load image:', mediaUrl);
+            };
+            
+            viewerImage.onload = handleImageLoad;
+            viewerImage.onerror = handleImageError;
+            viewerImage.src = mediaUrl;
+        }
+        
+        // Only start slideshow if explicitly requested (auto-play mode)
+        if (autoStartSlideshow && this.isAutoPlayMode) {
             this.startSlideshow();
         }
     }
@@ -1064,7 +1089,6 @@ class RedditViewer {
         if (this.filteredPosts.length === 0) return;
         
         const wasPlaying = this.isSlideshowPlaying;
-        this.stopSlideshow();
         
         let newIndex = this.currentViewerIndex + direction;
         if (newIndex < 0) {
@@ -1073,8 +1097,8 @@ class RedditViewer {
             newIndex = 0;
         }
         
-        // Preserve slideshow state when navigating
-        this.openViewer(newIndex, wasPlaying);
+        // Navigate - preserve slideshow state only if in auto-play mode
+        this.openViewer(newIndex, wasPlaying && this.isAutoPlayMode);
     }
 
     startSlideshow() {
