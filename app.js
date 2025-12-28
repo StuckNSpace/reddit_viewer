@@ -964,26 +964,31 @@ class RedditViewer {
         `;
         document.getElementById('viewerCounter').textContent = `${index + 1} / ${this.filteredPosts.length}`;
         
-        if (this.currentMediaIsVideo) {
-            // Use video element for both videos and GIFs
-            const isGif = mediaType === 'gif';
-            
+        // Check if it's a GIF (either by type or URL)
+        const isGif = mediaType === 'gif' || this.isGif(mediaUrl) || this.isGif(post.url);
+        
+        if (this.currentMediaIsVideo || isGif) {
+            // Use video element for both videos and GIFs (Reddit serves GIFs as MP4)
             viewerVideo.src = mediaUrl;
             viewerVideo.muted = true;
             
-            // GIFs always loop, videos loop only in manual mode
+            // GIFs always loop and auto-play, videos loop only in manual mode
             if (isGif) {
                 viewerVideo.loop = true; // GIFs always loop
+                viewerVideo.autoplay = true; // GIFs should auto-play
             } else {
                 viewerVideo.loop = this.isAutoPlayMode ? false : true; // Videos: no loop in auto-play mode
+                viewerVideo.autoplay = false; // Videos only play in auto-play mode
             }
             
             viewerVideo.playsInline = true;
             viewerVideo.controls = true; // Always show controls
+            viewerVideo.preload = 'auto'; // Preload for faster playback
             viewerVideo.classList.remove('hidden');
             
             // Clean up old handlers
             viewerVideo.onloadeddata = null;
+            viewerVideo.oncanplay = null;
             viewerVideo.onerror = null;
             
             // Remove any existing event listeners
@@ -994,36 +999,39 @@ class RedditViewer {
             // Load video
             viewerVideo.load();
             
-            const handleVideoLoad = () => {
+            const handleVideoReady = () => {
                 if (mediaContainer) {
                     mediaContainer.classList.remove('loading');
                 }
                 viewerVideo.classList.add('fade-in');
                 
-                // Always play GIFs, play videos only in auto-play mode
-                const shouldPlay = isGif || this.isAutoPlayMode;
-                
-                if (shouldPlay) {
+                // Always play GIFs immediately, play videos only in auto-play mode
+                if (isGif) {
+                    // GIFs should always play
                     viewerVideo.play().catch(err => {
                         if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
-                            console.log('Video/GIF play failed:', err);
+                            console.log('GIF play failed:', err);
+                            // Try again after a short delay
+                            setTimeout(() => {
+                                viewerVideo.play().catch(() => {});
+                            }, 100);
                         }
                     });
-                }
-                
-                // Set up auto-advance handler for auto-play mode
-                if (this.isAutoPlayMode && !isGif) {
-                    // For videos in auto-play mode: advance when video ends (after full playthrough)
+                } else if (this.isAutoPlayMode) {
+                    // Videos only play in auto-play mode
+                    viewerVideo.play().catch(err => {
+                        if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
+                            console.log('Video play failed:', err);
+                        }
+                    });
+                    
+                    // Set up auto-advance handler for videos in auto-play mode
                     this.videoEndedHandler = () => {
                         if (this.isAutoPlayMode && this.isSlideshowPlaying) {
                             setTimeout(() => this.navigateViewer(1), 500);
                         }
                     };
                     viewerVideo.addEventListener('ended', this.videoEndedHandler, { once: true });
-                } else if (this.isAutoPlayMode && isGif) {
-                    // For GIFs in auto-play mode: advance after slideshow speed delay
-                    // (GIFs loop, so we use time-based advancement)
-                    // This is handled by the slideshow interval
                 }
             };
             
@@ -1031,14 +1039,17 @@ class RedditViewer {
                 if (mediaContainer) {
                     mediaContainer.classList.remove('loading');
                 }
-                console.error('Failed to load video/GIF:', mediaUrl);
+                console.error('Failed to load video/GIF:', mediaUrl, 'Type:', mediaType);
             };
             
+            // Try multiple events to ensure playback
+            viewerVideo.addEventListener('loadeddata', handleVideoReady, { once: true });
+            viewerVideo.addEventListener('canplay', handleVideoReady, { once: true });
+            viewerVideo.addEventListener('error', handleVideoError, { once: true });
+            
+            // Also try to play immediately if already loaded
             if (viewerVideo.readyState >= 2) {
-                handleVideoLoad();
-            } else {
-                viewerVideo.addEventListener('loadeddata', handleVideoLoad, { once: true });
-                viewerVideo.addEventListener('error', handleVideoError, { once: true });
+                handleVideoReady();
             }
         } else {
             // Image
