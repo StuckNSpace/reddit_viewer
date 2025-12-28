@@ -649,9 +649,14 @@ class RedditViewer {
                 video.dataset.fallbackIndex = '0';
             }
             
-            // Set src and load immediately - this preloads the video when post is displayed
+            // Set src - don't force load, let browser handle it naturally
             video.src = videoUrl;
-            video.load(); // Force immediate loading - videos load when posts are displayed, not when clicked
+            
+            // Add crossOrigin attribute for CORS (may help with v.redd.it)
+            video.crossOrigin = 'anonymous';
+            
+            // Don't force load immediately - may be causing CORS/loading issues
+            // video.load(); // Commented out - let browser handle loading
             
             // Store URL for reuse in viewer (store original URL, not converted)
             video.dataset.mediaUrl = mediaUrl;
