@@ -640,7 +640,11 @@ class RedditViewer {
             const videoIdMatch = videoUrl.match(/v\.redd\.it\/([^\/]+)/);
             if (videoIdMatch) {
                 const videoId = videoIdMatch[1];
-                video.dataset.fallbackUrls = JSON.stringify(this.getVideoFallbackUrls(videoId));
+                let fallbackUrls = this.getVideoFallbackUrls(videoId);
+                // Remove the current URL from fallbacks to avoid retrying it
+                fallbackUrls = fallbackUrls.filter(url => url !== videoUrl);
+                video.dataset.fallbackUrls = JSON.stringify(fallbackUrls);
+                video.dataset.fallbackIndex = '0';
             }
             
             // Set src and load immediately - this preloads the video when post is displayed
@@ -650,25 +654,40 @@ class RedditViewer {
             // Store URL for reuse in viewer (store original URL, not converted)
             video.dataset.mediaUrl = mediaUrl;
             
-            // Error handling - log the actual URL being used
+            // Error handling with fallback URLs
             video.onerror = (() => {
                 const actualSrc = video.src;
+                const fallbackUrlsJson = video.dataset.fallbackUrls;
+                const fallbackUrls = fallbackUrlsJson ? JSON.parse(fallbackUrlsJson) : [];
+                let fallbackIndex = parseInt(video.dataset.fallbackIndex || '0');
+                
                 console.error('Grid Video/GIF load error - Element src:', actualSrc, 'Converted from:', mediaUrl, 'Video element readyState:', video.readyState);
+                
+                // Try next fallback URL if available
+                if (fallbackIndex < fallbackUrls.length) {
+                    const nextUrl = fallbackUrls[fallbackIndex];
+                    console.log('Grid: Trying fallback URL', fallbackIndex + 1, 'of', fallbackUrls.length, ':', nextUrl);
+                    fallbackIndex++;
+                    video.dataset.fallbackIndex = fallbackIndex.toString();
+                    video.src = nextUrl;
+                    video.load();
+                    return;
+                }
+                
+                // All fallbacks failed, show error image
+                console.error('Grid: All video URLs failed, showing error image');
                 const postUrl = post.url;
                 const postTitle = post.title;
-                return function() {
-                    console.error('Grid Video/GIF load error callback - Element src:', this.src || actualSrc, 'Original mediaUrl:', mediaUrl);
-                    // Fallback: try to show as image if video fails
-                    const img = document.createElement('img');
-                    img.src = postUrl || mediaUrl;
-                    img.alt = postTitle;
-                    img.onerror = function() {
-                        this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%231a1f2e" width="400" height="400"/%3E%3Ctext fill="%23b0b8c4" font-family="sans-serif" font-size="18" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EMedia not available%3C/text%3E%3C/svg%3E';
-                    };
-                    mediaContainer.innerHTML = '';
-                    mediaContainer.appendChild(img);
+                const img = document.createElement('img');
+                img.src = postUrl || mediaUrl;
+                img.alt = postTitle;
+                img.onerror = function() {
+                    this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%231a1f2e" width="400" height="400"/%3E%3Ctext fill="%23b0b8c4" font-family="sans-serif" font-size="18" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EMedia not available%3C/text%3E%3C/svg%3E';
                 };
-            })();
+                if (video.parentNode) {
+                    video.parentNode.replaceChild(img, video);
+                }
+            });
             
             // Track play state to prevent race conditions
             let isPlaying = false;
