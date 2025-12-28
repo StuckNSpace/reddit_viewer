@@ -570,8 +570,9 @@ class RedditViewer {
                     await playPromise;
                     video.controls = true;
                 } catch (err) {
-                    // Ignore play errors (user interaction, autoplay policy, etc.)
-                    if (err.name !== 'AbortError') {
+                    // Ignore AbortError - it's expected when pausing during play
+                    // Also ignore NotAllowedError (autoplay policy) - it's normal
+                    if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
                         console.log('Video/GIF play failed:', err);
                     }
                     isPlaying = false;
@@ -875,7 +876,12 @@ class RedditViewer {
             }
             
             viewerVideo.load(); // Reload video
-            viewerVideo.play().catch(err => console.log('Video/GIF play failed:', err));
+            viewerVideo.play().catch(err => {
+                // Ignore AbortError and NotAllowedError - these are expected
+                if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
+                    console.log('Video/GIF play failed:', err);
+                }
+            });
         } else {
             viewerImage.src = mediaUrl;
             viewerImage.classList.remove('hidden');
