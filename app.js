@@ -18,28 +18,109 @@ class RedditViewer {
         this.isShuffled = false;
         this.isAutoPlayMode = false;
         
+        // Load saved preferences
+        this.loadPreferences();
+        
         this.initializeEventListeners();
         this.initializeViewer();
+    }
+
+    loadPreferences() {
+        try {
+            const saved = localStorage.getItem('redditViewerPrefs');
+            if (saved) {
+                const prefs = JSON.parse(saved);
+                
+                // Restore subreddits
+                if (prefs.subreddits) {
+                    document.getElementById('subreddits').value = prefs.subreddits;
+                }
+                
+                // Restore filter settings
+                if (prefs.imagesOnly !== undefined) {
+                    this.imagesOnly = prefs.imagesOnly;
+                    document.getElementById('imagesOnly').checked = prefs.imagesOnly;
+                }
+                
+                if (prefs.videosOnly !== undefined) {
+                    this.videosOnly = prefs.videosOnly;
+                    document.getElementById('videosOnly').checked = prefs.videosOnly;
+                }
+                
+                // Restore shuffle state
+                if (prefs.isShuffled) {
+                    this.isShuffled = true;
+                    const mixBtn = document.getElementById('mixBtn');
+                    mixBtn.classList.add('active');
+                    mixBtn.textContent = '🔀 Shuffled';
+                }
+            }
+        } catch (e) {
+            console.log('Could not load preferences:', e);
+        }
+    }
+
+    savePreferences() {
+        try {
+            const prefs = {
+                subreddits: document.getElementById('subreddits').value,
+                imagesOnly: this.imagesOnly,
+                videosOnly: this.videosOnly,
+                isShuffled: this.isShuffled
+            };
+            localStorage.setItem('redditViewerPrefs', JSON.stringify(prefs));
+        } catch (e) {
+            console.log('Could not save preferences:', e);
+        }
+    }
+
+    clearPreferences() {
+        try {
+            localStorage.removeItem('redditViewerPrefs');
+            document.getElementById('subreddits').value = '';
+            this.imagesOnly = true;
+            this.videosOnly = true;
+            document.getElementById('imagesOnly').checked = true;
+            document.getElementById('videosOnly').checked = true;
+            this.isShuffled = false;
+            const mixBtn = document.getElementById('mixBtn');
+            mixBtn.classList.remove('active');
+            mixBtn.textContent = '🔀 Mix/Shuffle';
+            this.showError('Preferences cleared');
+            setTimeout(() => this.hideError(), 2000);
+        } catch (e) {
+            console.log('Could not clear preferences:', e);
+        }
     }
 
     initializeEventListeners() {
         document.getElementById('loadBtn').addEventListener('click', () => this.loadContent());
         document.getElementById('clearBtn').addEventListener('click', () => this.clearContent());
+        document.getElementById('clearMemoryBtn').addEventListener('click', () => this.clearPreferences());
         document.getElementById('loadMoreBtn').addEventListener('click', () => this.loadMore());
         document.getElementById('imagesOnly').addEventListener('change', (e) => {
             this.imagesOnly = e.target.checked;
+            this.savePreferences();
             this.filterAndDisplay();
         });
         document.getElementById('videosOnly').addEventListener('change', (e) => {
             this.videosOnly = e.target.checked;
+            this.savePreferences();
             this.filterAndDisplay();
         });
 
-        // Load on Enter key
-        document.getElementById('subreddits').addEventListener('keypress', (e) => {
+        // Load on Enter key and save on change
+        const subredditsInput = document.getElementById('subreddits');
+        subredditsInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.loadContent();
             }
+        });
+        subredditsInput.addEventListener('change', () => {
+            this.savePreferences();
+        });
+        subredditsInput.addEventListener('blur', () => {
+            this.savePreferences();
         });
 
         // Mix/Shuffle button
@@ -117,26 +198,39 @@ class RedditViewer {
             const allPosts = [];
             const errors = [];
             
-            // Fetch from all subreddits in parallel
-            const promises = this.currentSubreddits.map(subreddit => 
-                this.fetchSubredditPosts(subreddit)
-            );
+            // Limit concurrent requests to avoid overwhelming the API (max 5 at a time)
+            const MAX_CONCURRENT = 5;
+            const subreddits = [...this.currentSubreddits];
             
-            const results = await Promise.allSettled(promises);
-            
-            results.forEach((result, index) => {
-                if (result.status === 'fulfilled') {
-                    if (result.value && result.value.length > 0) {
-                        allPosts.push(...result.value);
+            // Process subreddits in batches
+            for (let i = 0; i < subreddits.length; i += MAX_CONCURRENT) {
+                const batch = subreddits.slice(i, i + MAX_CONCURRENT);
+                const promises = batch.map(subreddit => 
+                    this.fetchSubredditPosts(subreddit)
+                );
+                
+                const results = await Promise.allSettled(promises);
+                
+                results.forEach((result, batchIndex) => {
+                    const subredditIndex = i + batchIndex;
+                    if (result.status === 'fulfilled') {
+                        if (result.value && result.value.length > 0) {
+                            allPosts.push(...result.value);
+                        } else {
+                            errors.push(`r/${this.currentSubreddits[subredditIndex]} returned no posts`);
+                        }
                     } else {
-                        errors.push(`r/${this.currentSubreddits[index]} returned no posts`);
+                        const errorMsg = `r/${this.currentSubreddits[subredditIndex]}: ${result.reason?.message || result.reason}`;
+                        errors.push(errorMsg);
+                        console.error(`Failed to fetch ${this.currentSubreddits[subredditIndex]}:`, result.reason);
                     }
-                } else {
-                    const errorMsg = `r/${this.currentSubreddits[index]}: ${result.reason?.message || result.reason}`;
-                    errors.push(errorMsg);
-                    console.error(`Failed to fetch ${this.currentSubreddits[index]}:`, result.reason);
+                });
+                
+                // Small delay between batches to avoid rate limiting
+                if (i + MAX_CONCURRENT < subreddits.length) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
                 }
-            });
+            }
 
             // Show errors if any, but continue if we have some posts
             if (errors.length > 0 && allPosts.length === 0) {
@@ -209,35 +303,63 @@ class RedditViewer {
     }
 
     filterAndDisplay() {
-        const filtered = this.posts.filter(post => {
-            const hasImage = this.isImage(post.url) || this.isGif(post.url);
-            const hasVideo = this.isVideo(post) || this.isRedditVideo(post);
-            
-            if (this.imagesOnly && this.videosOnly) {
-                return hasImage || hasVideo;
-            } else if (this.imagesOnly) {
-                return hasImage;
-            } else if (this.videosOnly) {
-                return hasVideo;
+        // Use requestAnimationFrame for smoother UI updates
+        requestAnimationFrame(() => {
+            const filtered = this.posts.filter(post => {
+                const hasImage = this.isImage(post.url) || this.isGif(post.url);
+                const hasVideo = this.isVideo(post) || this.isRedditVideo(post);
+                
+                if (this.imagesOnly && this.videosOnly) {
+                    return hasImage || hasVideo;
+                } else if (this.imagesOnly) {
+                    return hasImage;
+                } else if (this.videosOnly) {
+                    return hasVideo;
+                }
+                return true;
+            });
+
+            // Shuffle if mix mode is enabled (optimized for large arrays)
+            if (this.isShuffled) {
+                this.shuffleArray(filtered);
             }
-            return true;
+
+            this.filteredPosts = filtered;
+            this.displayPosts(filtered);
         });
-
-        // Shuffle if mix mode is enabled
-        if (this.isShuffled) {
-            this.shuffleArray(filtered);
-        }
-
-        this.filteredPosts = filtered;
-        this.displayPosts(filtered);
     }
 
     shuffleArray(array) {
-        // Fisher-Yates shuffle algorithm
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
+        // Optimized Fisher-Yates shuffle for large arrays
+        // Process in chunks to avoid blocking the UI
+        const chunkSize = 1000;
+        let currentIndex = array.length;
+        
+        const shuffleChunk = () => {
+            const endIndex = Math.max(0, currentIndex - chunkSize);
+            
+            while (currentIndex > endIndex) {
+                currentIndex--;
+                const randomIndex = Math.floor(Math.random() * (currentIndex + 1));
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            
+            if (currentIndex > 0) {
+                // Continue shuffling next chunk asynchronously
+                setTimeout(shuffleChunk, 0);
+            }
+        };
+        
+        // If array is small, shuffle synchronously
+        if (array.length <= chunkSize) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        } else {
+            shuffleChunk();
         }
+        
         return array;
     }
 
@@ -251,6 +373,7 @@ class RedditViewer {
             mixBtn.classList.remove('active');
             mixBtn.textContent = '🔀 Mix/Shuffle';
         }
+        this.savePreferences();
         // Re-filter and display with new shuffle state
         this.filterAndDisplay();
     }
@@ -553,10 +676,11 @@ class RedditViewer {
 
     clearContent() {
         this.posts = [];
+        this.filteredPosts = [];
         this.currentAfter = null;
         document.getElementById('content').innerHTML = '';
         document.getElementById('loadMore').classList.add('hidden');
-        document.getElementById('subreddits').value = '';
+        // Don't clear the input value - keep it for user convenience
     }
 
     showLoading(show) {
