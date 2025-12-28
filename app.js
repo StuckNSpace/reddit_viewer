@@ -546,13 +546,44 @@ class RedditViewer {
                 };
             })();
             
+            // Track play state to prevent race conditions
+            let isPlaying = false;
+            let playPromise = null;
+            
             // Auto-play on hover, pause on leave
-            card.addEventListener('mouseenter', () => {
-                video.play().catch(err => console.log('Video/GIF play failed:', err));
-                video.controls = true;
+            card.addEventListener('mouseenter', async () => {
+                if (isPlaying) return; // Already playing
+                
+                try {
+                    // Wait for video to be ready
+                    if (video.readyState < 2) {
+                        await new Promise((resolve) => {
+                            video.addEventListener('loadeddata', resolve, { once: true });
+                            video.addEventListener('error', resolve, { once: true });
+                            // Timeout after 3 seconds
+                            setTimeout(resolve, 3000);
+                        });
+                    }
+                    
+                    isPlaying = true;
+                    playPromise = video.play();
+                    await playPromise;
+                    video.controls = true;
+                } catch (err) {
+                    // Ignore play errors (user interaction, autoplay policy, etc.)
+                    if (err.name !== 'AbortError') {
+                        console.log('Video/GIF play failed:', err);
+                    }
+                    isPlaying = false;
+                }
             });
             
             card.addEventListener('mouseleave', () => {
+                isPlaying = false;
+                // Cancel any pending play promise
+                if (playPromise) {
+                    playPromise.catch(() => {}); // Ignore cancellation errors
+                }
                 video.pause();
                 video.currentTime = 0; // Reset to beginning
                 video.controls = false;
