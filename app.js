@@ -688,52 +688,6 @@ class RedditViewer {
                 mediaWrapper.appendChild(video);
             }
             mediaContainer.appendChild(mediaWrapper);
-            
-            // Track play state to prevent race conditions
-            let isPlaying = false;
-            let playPromise = null;
-            
-            // Auto-play on hover, pause on leave
-            card.addEventListener('mouseenter', async () => {
-                if (isPlaying) return; // Already playing
-                
-                try {
-                    // Wait for video to be ready
-                    if (video.readyState < 2) {
-                        await new Promise((resolve) => {
-                            video.addEventListener('loadeddata', resolve, { once: true });
-                            video.addEventListener('error', resolve, { once: true });
-                            // Timeout after 3 seconds
-                            setTimeout(resolve, 3000);
-                        });
-                    }
-                    
-                    isPlaying = true;
-                    playPromise = video.play();
-                    await playPromise;
-                    video.controls = true;
-                } catch (err) {
-                    // Ignore AbortError - it's expected when pausing during play
-                    // Also ignore NotAllowedError (autoplay policy) - it's normal
-                    if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
-                        console.log('Video/GIF play failed:', err);
-                    }
-                    isPlaying = false;
-                }
-            });
-            
-            card.addEventListener('mouseleave', () => {
-                isPlaying = false;
-                // Cancel any pending play promise
-                if (playPromise) {
-                    playPromise.catch(() => {}); // Ignore cancellation errors
-                }
-                video.pause();
-                video.currentTime = 0; // Reset to beginning
-                video.controls = false;
-            });
-            
-            mediaContainer.appendChild(video);
         } else {
             const img = document.createElement('img');
             img.src = mediaUrl;
