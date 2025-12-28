@@ -772,6 +772,27 @@ class RedditViewer {
         return card;
     }
 
+    // Helper function to convert CMAF URLs to DASH format
+    convertToDASH(url) {
+        if (!url || !url.includes('v.redd.it')) return url;
+        
+        // If it's CMAF, convert to DASH
+        if (url.includes('CMAF')) {
+            return url.replace('/CMAF_', '/DASH_');
+        }
+        
+        // If it's v.redd.it but no format specified, construct DASH URL
+        if (!url.includes('DASH_') && !url.includes('HLS') && !url.includes('.')) {
+            const videoIdMatch = url.match(/v\.redd\.it\/([^\/]+)/);
+            if (videoIdMatch) {
+                const videoId = videoIdMatch[1];
+                return `https://v.redd.it/${videoId}/DASH_720.mp4`;
+            }
+        }
+        
+        return url;
+    }
+
     getMediaUrl(post) {
         if (!post) return '';
         
@@ -779,15 +800,15 @@ class RedditViewer {
         if (post.is_video || post.domain === 'v.redd.it') {
             // Try reddit_video fallback_url first (this is the DASH URL, not CMAF)
             if (post.media?.reddit_video?.fallback_url) {
-                return post.media.reddit_video.fallback_url;
+                return this.convertToDASH(post.media.reddit_video.fallback_url);
             }
             // Try secure_media
             if (post.secure_media?.reddit_video?.fallback_url) {
-                return post.secure_media.reddit_video.fallback_url;
+                return this.convertToDASH(post.secure_media.reddit_video.fallback_url);
             }
             // Try crosspost parent
             if (post.crosspost_parent_list?.[0]?.media?.reddit_video?.fallback_url) {
-                return post.crosspost_parent_list[0].media.reddit_video.fallback_url;
+                return this.convertToDASH(post.crosspost_parent_list[0].media.reddit_video.fallback_url);
             }
             // Try HLS URL if available
             if (post.media?.reddit_video?.hls_url) {
@@ -798,7 +819,7 @@ class RedditViewer {
         // For GIFs that Reddit converted to MP4, check for reddit_video_preview FIRST
         // This gives us the DASH URL (fallback_url) which works in browsers
         if (post.preview?.reddit_video_preview?.fallback_url) {
-            return post.preview.reddit_video_preview.fallback_url;
+            return this.convertToDASH(post.preview.reddit_video_preview.fallback_url);
         }
         
         // For animated GIFs/MP4s, check variants but convert CMAF to DASH
@@ -807,17 +828,7 @@ class RedditViewer {
             // Make sure it's a full URL
             if (mp4Url.startsWith('http')) {
                 // ALWAYS convert CMAF to DASH - CMAF doesn't work in browsers
-                if (mp4Url.includes('CMAF')) {
-                    mp4Url = mp4Url.replace('/CMAF_', '/DASH_');
-                }
-                // If it's v.redd.it but no format specified, construct DASH URL
-                if (mp4Url.includes('v.redd.it') && !mp4Url.includes('DASH_') && !mp4Url.includes('HLS')) {
-                    const videoIdMatch = mp4Url.match(/v\.redd\.it\/([^\/]+)/);
-                    if (videoIdMatch) {
-                        const videoId = videoIdMatch[1];
-                        mp4Url = `https://v.redd.it/${videoId}/DASH_720.mp4`;
-                    }
-                }
+                mp4Url = this.convertToDASH(mp4Url);
                 return mp4Url;
             }
         }
@@ -825,17 +836,7 @@ class RedditViewer {
             let gifUrl = post.preview.images[0].variants.gif.source.url.replace(/&amp;/g, '&');
             if (gifUrl.startsWith('http')) {
                 // ALWAYS convert CMAF to DASH
-                if (gifUrl.includes('CMAF')) {
-                    gifUrl = gifUrl.replace('/CMAF_', '/DASH_');
-                }
-                // If it's v.redd.it but no format specified, construct DASH URL
-                if (gifUrl.includes('v.redd.it') && !gifUrl.includes('DASH_') && !gifUrl.includes('HLS')) {
-                    const videoIdMatch = gifUrl.match(/v\.redd\.it\/([^\/]+)/);
-                    if (videoIdMatch) {
-                        const videoId = videoIdMatch[1];
-                        gifUrl = `https://v.redd.it/${videoId}/DASH_720.mp4`;
-                    }
-                }
+                gifUrl = this.convertToDASH(gifUrl);
                 return gifUrl;
             }
         }
