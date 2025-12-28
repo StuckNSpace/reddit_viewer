@@ -636,6 +636,13 @@ class RedditViewer {
                 console.log('Grid: Forced conversion result:', videoUrl);
             }
             
+            // Store fallback URLs for error handling
+            const videoIdMatch = videoUrl.match(/v\.redd\.it\/([^\/]+)/);
+            if (videoIdMatch) {
+                const videoId = videoIdMatch[1];
+                video.dataset.fallbackUrls = JSON.stringify(this.getVideoFallbackUrls(videoId));
+            }
+            
             // Set src and load immediately - this preloads the video when post is displayed
             video.src = videoUrl;
             video.load(); // Force immediate loading - videos load when posts are displayed, not when clicked
