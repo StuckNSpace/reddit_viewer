@@ -783,17 +783,25 @@ class RedditViewer {
             }
         }
 
-        // For GIFs that Reddit converted to MP4, check for variants
-        if (post.preview?.reddit_video_preview?.fallback_url) {
-            return post.preview.reddit_video_preview.fallback_url;
-        }
-
-        // For animated GIFs/MP4s, prefer the variants over static preview
+        // For GIFs that Reddit converted to MP4, check for variants FIRST (before reddit_video_preview)
+        // This is the most reliable source for animated GIFs
         if (post.preview?.images?.[0]?.variants?.mp4?.source?.url) {
-            return post.preview.images[0].variants.mp4.source.url.replace(/&amp;/g, '&');
+            const mp4Url = post.preview.images[0].variants.mp4.source.url.replace(/&amp;/g, '&');
+            // Make sure it's a full URL
+            if (mp4Url.startsWith('http')) {
+                return mp4Url;
+            }
         }
         if (post.preview?.images?.[0]?.variants?.gif?.source?.url) {
-            return post.preview.images[0].variants.gif.source.url.replace(/&amp;/g, '&');
+            const gifUrl = post.preview.images[0].variants.gif.source.url.replace(/&amp;/g, '&');
+            if (gifUrl.startsWith('http')) {
+                return gifUrl;
+            }
+        }
+        
+        // For GIFs that Reddit converted to MP4, check for reddit_video_preview
+        if (post.preview?.reddit_video_preview?.fallback_url) {
+            return post.preview.reddit_video_preview.fallback_url;
         }
 
         // For direct GIF URLs, use the URL directly
@@ -1009,19 +1017,33 @@ class RedditViewer {
             // Use video element for MP4-converted GIFs and videos
             console.log('Loading video/GIF:', mediaUrl, 'Type:', mediaType, 'IsGIF:', isGif);
             
-            // Set attributes before setting src to ensure proper loading
-            viewerVideo.muted = true;
-            viewerVideo.playsInline = true;
-            viewerVideo.controls = true; // Always show controls
-            viewerVideo.preload = 'auto'; // Preload for faster playback
+            // Check if we have a preloaded video from the grid
+            const preloadedVideo = document.querySelector(`video[data-media-url="${mediaUrl}"]`);
             
-            // GIFs always loop and auto-play, videos loop only in manual mode
-            if (isGif) {
-                viewerVideo.loop = true; // GIFs always loop
-                viewerVideo.autoplay = true; // GIFs should auto-play
+            if (preloadedVideo && preloadedVideo.readyState >= 2) {
+                // Use the preloaded video - copy its buffered data
+                console.log('Using preloaded video, readyState:', preloadedVideo.readyState);
+                viewerVideo.src = mediaUrl;
+                viewerVideo.load();
             } else {
-                viewerVideo.loop = this.isAutoPlayMode ? false : true; // Videos: no loop in auto-play mode
-                viewerVideo.autoplay = false; // Videos only play in auto-play mode
+                // Set attributes before setting src to ensure proper loading
+                viewerVideo.muted = true;
+                viewerVideo.playsInline = true;
+                viewerVideo.controls = true; // Always show controls
+                viewerVideo.preload = 'auto'; // Preload for faster playback
+                
+                // GIFs always loop and auto-play, videos loop only in manual mode
+                if (isGif) {
+                    viewerVideo.loop = true; // GIFs always loop
+                    viewerVideo.autoplay = true; // GIFs should auto-play
+                } else {
+                    viewerVideo.loop = this.isAutoPlayMode ? false : true; // Videos: no loop in auto-play mode
+                    viewerVideo.autoplay = false; // Videos only play in auto-play mode
+                }
+                
+                // Set src and load - this must happen after setting attributes
+                viewerVideo.src = mediaUrl;
+                viewerVideo.load(); // Explicitly call load() to start loading
             }
             
             viewerVideo.classList.remove('hidden');
@@ -1035,10 +1057,6 @@ class RedditViewer {
             if (this.videoEndedHandler) {
                 viewerVideo.removeEventListener('ended', this.videoEndedHandler);
             }
-            
-            // Set src and load - this must happen after setting attributes
-            viewerVideo.src = mediaUrl;
-            viewerVideo.load(); // Explicitly call load() to start loading
             
             // Set up timeout to remove loading state if video takes too long
             let loadingTimeout = setTimeout(() => {
