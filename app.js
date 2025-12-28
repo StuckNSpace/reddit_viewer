@@ -482,7 +482,12 @@ class RedditViewer {
 
         // Start from first item or random
         const startIndex = this.isShuffled ? Math.floor(Math.random() * this.filteredPosts.length) : 0;
+        
+        // Open viewer and start slideshow
         this.openViewer(startIndex, true);
+        
+        // Start slideshow immediately
+        this.startSlideshow();
         
         // Auto-enter fullscreen
         setTimeout(() => {
