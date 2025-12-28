@@ -197,6 +197,7 @@ class RedditViewer {
         try {
             const allPosts = [];
             const errors = [];
+            let hasDisplayedInitialContent = false;
             
             // Limit concurrent requests to avoid overwhelming the API (max 5 at a time)
             const MAX_CONCURRENT = 5;
@@ -226,6 +227,17 @@ class RedditViewer {
                     }
                 });
                 
+                // Display content progressively as it loads
+                if (allPosts.length > 0) {
+                    // Sort by score
+                    const sortedPosts = [...allPosts].sort((a, b) => (b.score || 0) - (a.score || 0));
+                    this.posts = [...this.posts, ...sortedPosts];
+                    
+                    // Filter and display immediately
+                    this.filterAndDisplayProgressive(!hasDisplayedInitialContent);
+                    hasDisplayedInitialContent = true;
+                }
+                
                 // Small delay between batches to avoid rate limiting
                 if (i + MAX_CONCURRENT < subreddits.length) {
                     await new Promise(resolve => setTimeout(resolve, 100));
@@ -237,7 +249,6 @@ class RedditViewer {
                 this.showError(`Failed to load content: ${errors.join(', ')}`);
             } else if (errors.length > 0) {
                 console.warn('Some subreddits failed to load:', errors);
-                // Still show content if we got some posts
             }
 
             if (allPosts.length === 0) {
@@ -245,10 +256,8 @@ class RedditViewer {
                 return;
             }
 
-            // Sort by score (upvotes) descending
-            allPosts.sort((a, b) => (b.score || 0) - (a.score || 0));
-            
-            this.posts = [...this.posts, ...allPosts];
+            // Final sort and display (in case shuffle mode needs full dataset)
+            this.posts.sort((a, b) => (b.score || 0) - (a.score || 0));
             this.filterAndDisplay();
             
         } catch (error) {
@@ -302,7 +311,7 @@ class RedditViewer {
         }
     }
 
-    filterAndDisplay() {
+    filterAndDisplay(forceFullRefresh = false) {
         // Use requestAnimationFrame for smoother UI updates
         requestAnimationFrame(() => {
             const filtered = this.posts.filter(post => {
@@ -319,13 +328,43 @@ class RedditViewer {
                 return true;
             });
 
-            // Shuffle if mix mode is enabled (optimized for large arrays)
-            if (this.isShuffled) {
+            // Shuffle if mix mode is enabled
+            // For shuffle mode, we need the full dataset, so only shuffle on final display
+            if (this.isShuffled && forceFullRefresh) {
                 this.shuffleArray(filtered);
             }
 
             this.filteredPosts = filtered;
-            this.displayPosts(filtered);
+            this.displayPosts(filtered, !forceFullRefresh);
+        });
+    }
+
+    filterAndDisplayProgressive(isInitial = false) {
+        // Progressive display - show content as it loads
+        requestAnimationFrame(() => {
+            const filtered = this.posts.filter(post => {
+                const hasImage = this.isImage(post.url) || this.isGif(post.url);
+                const hasVideo = this.isVideo(post) || this.isRedditVideo(post);
+                
+                if (this.imagesOnly && this.videosOnly) {
+                    return hasImage || hasVideo;
+                } else if (this.imagesOnly) {
+                    return hasImage;
+                } else if (this.videosOnly) {
+                    return hasVideo;
+                }
+                return true;
+            });
+
+            // For progressive loading, don't shuffle yet - just show top content first
+            // Shuffle will happen on final display
+            this.filteredPosts = filtered;
+            
+            // Display top posts first (sorted by score)
+            const sortedFiltered = [...filtered].sort((a, b) => (b.score || 0) - (a.score || 0));
+            const topPosts = sortedFiltered.slice(0, Math.min(50, sortedFiltered.length)); // Show first 50
+            
+            this.displayPosts(topPosts, true); // Append mode for progressive loading
         });
     }
 
@@ -431,21 +470,42 @@ class RedditViewer {
         return post && (post.is_video === true || (post.media?.reddit_video?.fallback_url));
     }
 
-    displayPosts(posts) {
+    displayPosts(posts, appendMode = false) {
         const contentGrid = document.getElementById('content');
         
         if (posts.length === 0) {
-            contentGrid.innerHTML = '<p style="text-align: center; color: var(--text-secondary); grid-column: 1 / -1;">No media content found. Try different subreddits or adjust filters.</p>';
+            if (!appendMode) {
+                contentGrid.innerHTML = '<p style="text-align: center; color: var(--text-secondary); grid-column: 1 / -1;">No media content found. Try different subreddits or adjust filters.</p>';
+            }
             document.getElementById('loadMore').classList.add('hidden');
             return;
         }
 
-        // Clear existing content
-        contentGrid.innerHTML = '';
+        // Clear existing content only if not in append mode
+        if (!appendMode) {
+            contentGrid.innerHTML = '';
+        }
 
+        // Track existing post IDs to avoid duplicates
+        const existingIds = new Set();
+        if (appendMode) {
+            contentGrid.querySelectorAll('.media-card').forEach(card => {
+                const postId = card.dataset.postId;
+                if (postId) existingIds.add(postId);
+            });
+        }
+
+        // Add new posts
         posts.forEach(post => {
+            // Skip if already displayed (for append mode)
+            if (appendMode && existingIds.has(post.id)) {
+                return;
+            }
+            
             const card = this.createMediaCard(post);
+            card.dataset.postId = post.id; // Store ID for duplicate checking
             contentGrid.appendChild(card);
+            existingIds.add(post.id);
         });
 
         // Show load more button if we have more content
