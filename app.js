@@ -645,11 +645,12 @@ class RedditViewer {
             
             // Error handling - log the actual URL being used
             video.onerror = (() => {
-                console.error('Video/GIF load error - URL used:', video.src, 'Converted from:', mediaUrl, 'Video element src:', video.src);
+                const actualSrc = video.src;
+                console.error('Grid Video/GIF load error - Element src:', actualSrc, 'Converted from:', mediaUrl, 'Video element readyState:', video.readyState);
                 const postUrl = post.url;
                 const postTitle = post.title;
                 return function() {
-                    console.error('Video/GIF load error:', mediaUrl);
+                    console.error('Grid Video/GIF load error callback - Element src:', this.src || actualSrc, 'Original mediaUrl:', mediaUrl);
                     // Fallback: try to show as image if video fails
                     const img = document.createElement('img');
                     img.src = postUrl || mediaUrl;
