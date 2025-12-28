@@ -272,86 +272,22 @@ class RedditViewer {
         try {
             // Clean subreddit name (remove r/ if present)
             const cleanSubreddit = subreddit.replace(/^r\//, '').trim();
+            const url = `https://www.reddit.com/r/${cleanSubreddit}/hot.json?limit=25${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
             
-            // Reddit API URL (will be proxied)
-            const redditUrl = `https://www.reddit.com/r/${encodeURIComponent(cleanSubreddit)}/hot.json?limit=25&raw_json=1${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
+            const response = await fetch(url);
             
-            // Use CORS proxy to bypass CORS restrictions - Reddit blocks direct browser requests
-            // Use allorigins.win as primary proxy
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(redditUrl)}`;
-            
-            console.log(`Fetching via proxy: r/${cleanSubreddit}`);
-            
-            let response;
-            try {
-                response = await fetch(proxyUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                    },
-                    mode: 'cors',
-                    cache: 'no-cache'
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Proxy request failed: ${response.status}`);
-                }
-            } catch (err) {
-                // Try fallback proxy
-                console.log(`Primary proxy failed, trying fallback...`);
-                const fallbackUrl = `https://corsproxy.io/?${encodeURIComponent(redditUrl)}`;
-                try {
-                    response = await fetch(fallbackUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json',
-                        },
-                        mode: 'cors',
-                        cache: 'no-cache'
-                    });
-                } catch (err2) {
-                    throw new Error(`All CORS proxies failed for r/${cleanSubreddit}`);
-                }
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
             
-            let data = await response.json();
-            
-            // Handle different proxy response formats
-            if (data.contents) {
-                // allorigins.win format
-                try {
-                    data = JSON.parse(data.contents);
-                } catch (e) {
-                    console.error('Failed to parse proxy response:', e);
-                    throw new Error(`Invalid response from proxy for r/${cleanSubreddit}`);
-                }
-            } else if (data.status && data.status.http_code !== 200) {
-                // codetabs proxy error format
-                throw new Error(`Proxy error for r/${cleanSubreddit}: ${data.status.http_code}`);
-            }
-            
-            console.log(`Data received for r/${cleanSubreddit}:`, data.data?.children?.length || 0, 'posts');
-            
-            // Validate response structure
-            if (!data || !data.data) {
-                console.error('Invalid Reddit API response structure:', data);
-                throw new Error(`Invalid response from r/${cleanSubreddit}`);
-            }
-            
-            if (!data.data.children || !Array.isArray(data.data.children)) {
-                console.error('No children array in response:', data);
-                throw new Error(`No posts found in r/${cleanSubreddit}`);
-            }
+            const data = await response.json();
             
             if (this.currentAfter === null) {
                 // Only update after token on first load
                 this.currentAfter = data.data.after;
             }
             
-            const posts = data.data.children.map(child => child.data).filter(post => post); // Filter out null posts
-            console.log(`Processed ${posts.length} posts from r/${cleanSubreddit}`);
-            
-            return posts;
+            return data.data.children.map(child => child.data);
         } catch (error) {
             console.error(`Error fetching r/${subreddit}:`, error);
             // Return empty array instead of throwing to allow other subreddits to load
