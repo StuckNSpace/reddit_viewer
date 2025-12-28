@@ -609,25 +609,26 @@ class RedditViewer {
         if (mediaType === 'video' || mediaType === 'gif') {
             // Use video element for both videos and GIFs (since Reddit serves GIFs as MP4)
             const video = document.createElement('video');
-            video.src = mediaUrl;
+            
+            // Set attributes first
             video.controls = false; // Hide controls for cleaner look, show on hover
             video.muted = true;
             video.loop = true;
             video.playsInline = true;
             video.preload = 'auto'; // Preload full video for faster display
             
-            // For GIFs, preload more aggressively
-            if (mediaType === 'gif') {
-                video.preload = 'auto';
-                // Start loading immediately
-                video.load();
-            }
-            
             // Add poster/thumbnail for faster initial display
             const thumbnailUrl = this.getThumbnailUrl(post);
             if (thumbnailUrl) {
                 video.poster = thumbnailUrl;
             }
+            
+            // Set src and load immediately - this preloads the video when post is displayed
+            video.src = mediaUrl;
+            video.load(); // Force immediate loading - videos load when posts are displayed, not when clicked
+            
+            // Store URL for reuse in viewer
+            video.dataset.mediaUrl = mediaUrl;
             
             // Error handling
             video.onerror = (() => {
