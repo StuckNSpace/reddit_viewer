@@ -273,25 +273,35 @@ class RedditViewer {
             // Clean subreddit name (remove r/ if present)
             const cleanSubreddit = subreddit.replace(/^r\//, '').trim();
             
-            // Reddit API URL
+            // Reddit API URL (will be proxied)
             const redditUrl = `https://www.reddit.com/r/${encodeURIComponent(cleanSubreddit)}/hot.json?limit=25&raw_json=1${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
             
-            // Use CORS proxy to bypass CORS restrictions
-            // Try multiple proxy services for reliability
-            const proxyUrls = [
-                `https://api.allorigins.win/get?url=${encodeURIComponent(redditUrl)}`,
-                `https://corsproxy.io/?${encodeURIComponent(redditUrl)}`,
-                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(redditUrl)}`
-            ];
+            // Use CORS proxy to bypass CORS restrictions - Reddit blocks direct browser requests
+            // Use allorigins.win as primary proxy
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(redditUrl)}`;
             
-            let response = null;
-            let lastError = null;
+            console.log(`Fetching via proxy: r/${cleanSubreddit}`);
             
-            // Try each proxy until one works
-            for (const proxyUrl of proxyUrls) {
+            let response;
+            try {
+                response = await fetch(proxyUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                    mode: 'cors',
+                    cache: 'no-cache'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Proxy request failed: ${response.status}`);
+                }
+            } catch (err) {
+                // Try fallback proxy
+                console.log(`Primary proxy failed, trying fallback...`);
+                const fallbackUrl = `https://corsproxy.io/?${encodeURIComponent(redditUrl)}`;
                 try {
-                    console.log(`Trying proxy: ${proxyUrl.substring(0, 50)}...`);
-                    response = await fetch(proxyUrl, {
+                    response = await fetch(fallbackUrl, {
                         method: 'GET',
                         headers: {
                             'Accept': 'application/json',
@@ -299,20 +309,9 @@ class RedditViewer {
                         mode: 'cors',
                         cache: 'no-cache'
                     });
-                    
-                    if (response.ok) {
-                        console.log(`Proxy success for r/${cleanSubreddit}`);
-                        break;
-                    }
-                } catch (err) {
-                    console.log(`Proxy failed, trying next...`);
-                    lastError = err;
-                    response = null;
+                } catch (err2) {
+                    throw new Error(`All CORS proxies failed for r/${cleanSubreddit}`);
                 }
-            }
-            
-            if (!response || !response.ok) {
-                throw new Error(`All CORS proxies failed for r/${cleanSubreddit}`);
             }
             
             let data = await response.json();
