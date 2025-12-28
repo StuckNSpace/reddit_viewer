@@ -1275,6 +1275,7 @@ class RedditViewer {
                 console.log('Video/GIF already loaded, playing immediately');
                 handleVideoReady();
             }
+            } // Close else block for non-v.redd.it videos
         } else {
             // Image
             viewerImage.src = '';
