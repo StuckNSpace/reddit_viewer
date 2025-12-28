@@ -623,11 +623,18 @@ class RedditViewer {
                 video.poster = thumbnailUrl;
             }
             
+            // Fix CMAF URLs to DASH format (CMAF doesn't work in browsers)
+            let videoUrl = mediaUrl;
+            if (videoUrl.includes('v.redd.it') && videoUrl.includes('CMAF')) {
+                // Convert CMAF to DASH: CMAF_1080.mp4 -> DASH_1080.mp4
+                videoUrl = videoUrl.replace('/CMAF_', '/DASH_');
+            }
+            
             // Set src and load immediately - this preloads the video when post is displayed
-            video.src = mediaUrl;
+            video.src = videoUrl;
             video.load(); // Force immediate loading - videos load when posts are displayed, not when clicked
             
-            // Store URL for reuse in viewer
+            // Store URL for reuse in viewer (store original URL, not converted)
             video.dataset.mediaUrl = mediaUrl;
             
             // Error handling
@@ -1031,34 +1038,33 @@ class RedditViewer {
             // Use video element for MP4-converted GIFs and videos
             console.log('Loading video/GIF:', mediaUrl, 'Type:', mediaType, 'IsGIF:', isGif);
             
-            // Check if we have a preloaded video from the grid
-            const preloadedVideo = document.querySelector(`video[data-media-url="${mediaUrl}"]`);
-            
-            if (preloadedVideo && preloadedVideo.readyState >= 2) {
-                // Use the preloaded video - copy its buffered data
-                console.log('Using preloaded video, readyState:', preloadedVideo.readyState);
-                viewerVideo.src = mediaUrl;
-                viewerVideo.load();
-            } else {
-                // Set attributes before setting src to ensure proper loading
-                viewerVideo.muted = true;
-                viewerVideo.playsInline = true;
-                viewerVideo.controls = true; // Always show controls
-                viewerVideo.preload = 'auto'; // Preload for faster playback
-                
-                // GIFs always loop and auto-play, videos loop only in manual mode
-                if (isGif) {
-                    viewerVideo.loop = true; // GIFs always loop
-                    viewerVideo.autoplay = true; // GIFs should auto-play
-                } else {
-                    viewerVideo.loop = this.isAutoPlayMode ? false : true; // Videos: no loop in auto-play mode
-                    viewerVideo.autoplay = false; // Videos only play in auto-play mode
-                }
-                
-                // Set src and load - this must happen after setting attributes
-                viewerVideo.src = mediaUrl;
-                viewerVideo.load(); // Explicitly call load() to start loading
+            // Try to fix CMAF URLs to DASH format (DASH works better in browsers)
+            // CMAF URLs like v.redd.it/xxx/CMAF_1080.mp4 don't work, need DASH_1080.mp4
+            let videoUrl = mediaUrl;
+            if (videoUrl.includes('v.redd.it') && videoUrl.includes('CMAF')) {
+                // Convert CMAF to DASH: CMAF_1080.mp4 -> DASH_1080.mp4
+                videoUrl = videoUrl.replace('/CMAF_', '/DASH_');
+                console.log('Converted CMAF to DASH URL:', videoUrl);
             }
+            
+            // Set attributes before setting src to ensure proper loading
+            viewerVideo.muted = true;
+            viewerVideo.playsInline = true;
+            viewerVideo.controls = true; // Always show controls
+            viewerVideo.preload = 'auto'; // Preload for faster playback
+            
+            // GIFs always loop and auto-play, videos loop only in manual mode
+            if (isGif) {
+                viewerVideo.loop = true; // GIFs always loop
+                viewerVideo.autoplay = true; // GIFs should auto-play
+            } else {
+                viewerVideo.loop = this.isAutoPlayMode ? false : true; // Videos: no loop in auto-play mode
+                viewerVideo.autoplay = false; // Videos only play in auto-play mode
+            }
+            
+            // Set src and load - this must happen after setting attributes
+            viewerVideo.src = videoUrl;
+            viewerVideo.load(); // Explicitly call load() to start loading
             
             viewerVideo.classList.remove('hidden');
             
