@@ -966,9 +966,42 @@ class RedditViewer {
         
         // Check if it's a GIF (either by type or URL)
         const isGif = mediaType === 'gif' || this.isGif(mediaUrl) || this.isGif(post.url);
+        const isDirectGif = /\.gif$/i.test(mediaUrl) || /\.gif$/i.test(post.url);
         
-        if (this.currentMediaIsVideo || isGif) {
-            // Use video element for both videos and GIFs (Reddit serves GIFs as MP4)
+        // For direct .gif files, use img element instead of video
+        if (isDirectGif && !mediaUrl.includes('reddit.com') && !mediaUrl.includes('i.redd.it')) {
+            // Direct GIF file - use img element
+            viewerImage.src = mediaUrl;
+            viewerImage.classList.remove('hidden');
+            viewerVideo.classList.add('hidden');
+            
+            const handleImageLoad = () => {
+                if (mediaContainer) {
+                    mediaContainer.classList.remove('loading');
+                }
+                viewerImage.classList.add('fade-in');
+            };
+            
+            const handleImageError = () => {
+                if (mediaContainer) {
+                    mediaContainer.classList.remove('loading');
+                }
+                console.error('Failed to load GIF image:', mediaUrl);
+            };
+            
+            viewerImage.onload = handleImageLoad;
+            viewerImage.onerror = handleImageError;
+            
+            // Set timeout for image loading too
+            setTimeout(() => {
+                if (mediaContainer && mediaContainer.classList.contains('loading')) {
+                    mediaContainer.classList.remove('loading');
+                }
+            }, 8000);
+        } else if (this.currentMediaIsVideo || isGif) {
+            // Use video element for MP4-converted GIFs and videos
+            console.log('Loading video/GIF:', mediaUrl, 'Type:', mediaType, 'IsGIF:', isGif);
+            
             viewerVideo.src = mediaUrl;
             viewerVideo.muted = true;
             
@@ -999,7 +1032,7 @@ class RedditViewer {
             // Set up timeout to remove loading state if video takes too long
             let loadingTimeout = setTimeout(() => {
                 if (mediaContainer && mediaContainer.classList.contains('loading')) {
-                    console.warn('Video/GIF loading timeout, removing loading state');
+                    console.warn('Video/GIF loading timeout, removing loading state. URL:', mediaUrl, 'ReadyState:', viewerVideo.readyState);
                     mediaContainer.classList.remove('loading');
                     // Try to play anyway if we have some data
                     if (isGif && viewerVideo.readyState >= 2) {
@@ -1017,6 +1050,8 @@ class RedditViewer {
             
             const handleVideoReady = () => {
                 clearLoadingTimeout();
+                
+                console.log('Video/GIF ready:', mediaUrl, 'ReadyState:', viewerVideo.readyState);
                 
                 if (mediaContainer) {
                     mediaContainer.classList.remove('loading');
@@ -1066,16 +1101,27 @@ class RedditViewer {
             const handleVideoError = (e) => {
                 clearLoadingTimeout();
                 
+                console.error('Failed to load video/GIF:', mediaUrl, 'Type:', mediaType, 'Error:', e, 'ReadyState:', viewerVideo.readyState);
+                
                 if (mediaContainer) {
                     mediaContainer.classList.remove('loading');
                 }
-                console.error('Failed to load video/GIF:', mediaUrl, 'Type:', mediaType, 'Error:', e);
             };
             
-            // Add event listeners
-            viewerVideo.addEventListener('loadeddata', handleVideoReady, { once: true });
-            viewerVideo.addEventListener('canplay', handleVideoReady, { once: true });
-            viewerVideo.addEventListener('canplaythrough', handleVideoReady, { once: true });
+            // Add event listeners with logging
+            viewerVideo.addEventListener('loadstart', () => console.log('Video/GIF loadstart:', mediaUrl), { once: true });
+            viewerVideo.addEventListener('loadeddata', () => {
+                console.log('Video/GIF loadeddata:', mediaUrl);
+                handleVideoReady();
+            }, { once: true });
+            viewerVideo.addEventListener('canplay', () => {
+                console.log('Video/GIF canplay:', mediaUrl);
+                handleVideoReady();
+            }, { once: true });
+            viewerVideo.addEventListener('canplaythrough', () => {
+                console.log('Video/GIF canplaythrough:', mediaUrl);
+                handleVideoReady();
+            }, { once: true });
             viewerVideo.addEventListener('error', handleVideoError, { once: true });
             
             // Load video
@@ -1083,6 +1129,7 @@ class RedditViewer {
             
             // Also try to play immediately if already loaded
             if (viewerVideo.readyState >= 2) {
+                console.log('Video/GIF already loaded, playing immediately');
                 handleVideoReady();
             }
         } else {
