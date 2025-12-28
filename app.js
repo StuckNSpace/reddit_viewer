@@ -839,9 +839,16 @@ class RedditViewer {
         
         console.log('getMediaUrl called for post:', post.id, 'URL:', post.url);
         
-        // Reddit video - check multiple possible locations
+        // Reddit video - check multiple possible locations (following API docs)
         if (post.is_video || post.domain === 'v.redd.it') {
-            // Try HLS URL first (most reliable for browser playback)
+            // Check transcoding status first (API docs recommend this)
+            const transcodingStatus = post.media?.reddit_video?.transcoding_status || 
+                                     post.secure_media?.reddit_video?.transcoding_status;
+            if (transcodingStatus && transcodingStatus !== 'completed') {
+                console.warn('getMediaUrl: Video transcoding not completed:', transcodingStatus);
+            }
+            
+            // Try HLS URL first (most reliable for browser playback per API docs)
             if (post.media?.reddit_video?.hls_url) {
                 console.log('getMediaUrl: Using media.reddit_video.hls_url:', post.media.reddit_video.hls_url);
                 return post.media.reddit_video.hls_url;
@@ -849,6 +856,16 @@ class RedditViewer {
             if (post.secure_media?.reddit_video?.hls_url) {
                 console.log('getMediaUrl: Using secure_media.reddit_video.hls_url:', post.secure_media.reddit_video.hls_url);
                 return post.secure_media.reddit_video.hls_url;
+            }
+            
+            // Try dash_url field (API docs mention this)
+            if (post.media?.reddit_video?.dash_url) {
+                console.log('getMediaUrl: Using media.reddit_video.dash_url:', post.media.reddit_video.dash_url);
+                return post.media.reddit_video.dash_url;
+            }
+            if (post.secure_media?.reddit_video?.dash_url) {
+                console.log('getMediaUrl: Using secure_media.reddit_video.dash_url:', post.secure_media.reddit_video.dash_url);
+                return post.secure_media.reddit_video.dash_url;
             }
             
             // Try reddit_video fallback_url (this is the DASH URL from Reddit)
@@ -879,28 +896,42 @@ class RedditViewer {
             return url; // Use Reddit's provided URL as-is
         }
         
-        // For animated GIFs/MP4s, check variants but convert CMAF to DASH
-        if (post.preview?.images?.[0]?.variants?.mp4?.source?.url) {
-            let mp4Url = post.preview.images[0].variants.mp4.source.url.replace(/&amp;/g, '&');
-            // Make sure it's a full URL
-            if (mp4Url.startsWith('http')) {
-                // Only convert CMAF to DASH, otherwise use Reddit's URL as-is
-                if (mp4Url.includes('CMAF')) {
-                    mp4Url = this.convertToDASH(mp4Url);
+        // For animated GIFs/MP4s, check variants - look for DASH variant first
+        // API docs suggest checking for DASH variants in preview structure
+        if (post.preview?.images?.[0]?.variants) {
+            // Check for DASH variant first (if Reddit provides it)
+            if (post.preview.images[0].variants.dash?.source?.url) {
+                const dashUrl = post.preview.images[0].variants.dash.source.url.replace(/&amp;/g, '&');
+                if (dashUrl.startsWith('http')) {
+                    console.log('getMediaUrl: Using preview.images[0].variants.dash.source.url:', dashUrl);
+                    return dashUrl;
                 }
-                console.log('getMediaUrl: Using preview.images[0].variants.mp4.source.url:', mp4Url);
-                return mp4Url;
             }
-        }
-        if (post.preview?.images?.[0]?.variants?.gif?.source?.url) {
-            let gifUrl = post.preview.images[0].variants.gif.source.url.replace(/&amp;/g, '&');
-            if (gifUrl.startsWith('http')) {
-                // Only convert CMAF to DASH, otherwise use Reddit's URL as-is
-                if (gifUrl.includes('CMAF')) {
-                    gifUrl = this.convertToDASH(gifUrl);
+            
+            // Then check MP4 variant (may contain CMAF)
+            if (post.preview.images[0].variants.mp4?.source?.url) {
+                let mp4Url = post.preview.images[0].variants.mp4.source.url.replace(/&amp;/g, '&');
+                if (mp4Url.startsWith('http')) {
+                    // Only convert CMAF to DASH if no DASH variant available
+                    if (mp4Url.includes('CMAF')) {
+                        mp4Url = this.convertToDASH(mp4Url);
+                    }
+                    console.log('getMediaUrl: Using preview.images[0].variants.mp4.source.url:', mp4Url);
+                    return mp4Url;
                 }
-                console.log('getMediaUrl: Using preview.images[0].variants.gif.source.url:', gifUrl);
-                return gifUrl;
+            }
+            
+            // Check GIF variant
+            if (post.preview.images[0].variants.gif?.source?.url) {
+                let gifUrl = post.preview.images[0].variants.gif.source.url.replace(/&amp;/g, '&');
+                if (gifUrl.startsWith('http')) {
+                    // Only convert CMAF to DASH if no DASH variant available
+                    if (gifUrl.includes('CMAF')) {
+                        gifUrl = this.convertToDASH(gifUrl);
+                    }
+                    console.log('getMediaUrl: Using preview.images[0].variants.gif.source.url:', gifUrl);
+                    return gifUrl;
+                }
             }
         }
         
