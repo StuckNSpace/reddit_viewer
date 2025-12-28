@@ -914,41 +914,34 @@ class RedditViewer {
             }
         }
         
-        // DO NOT construct URLs - Reddit blocks them with 403 Forbidden
-        // Only use URLs that Reddit provides in the API response
-        console.warn('getMediaUrl: No usable media URL found for post:', post.id);
-        console.warn('Post data:', {
-            url: post.url,
-            is_video: post.is_video,
-            domain: post.domain,
-            has_media: !!post.media,
-            has_secure_media: !!post.secure_media,
-            has_preview: !!post.preview
-        });
-        
-        // Return empty string - we'll show thumbnail/error image instead
-        return '';
-
-        // For direct GIF URLs, use the URL directly
-        if (post.url && /\.gif$/i.test(post.url)) {
+        // For regular images (i.redd.it, imgur, etc.), use the post URL directly
+        if (post.url && (
+            post.url.includes('i.redd.it') || 
+            post.url.includes('i.imgur.com') ||
+            /\.(jpg|jpeg|png|gif|webp)$/i.test(post.url)
+        )) {
+            console.log('getMediaUrl: Using post.url for image:', post.url);
             return post.url;
         }
-
-        // Preview images (static) - use source or resolutions
+        
+        // Try preview images (static) - use source or resolutions
         if (post.preview?.images?.[0]?.source?.url) {
             const previewUrl = post.preview.images[0].source.url.replace(/&amp;/g, '&');
-            // Don't use preview if we have a direct URL that's better
-            if (post.url && !post.url.includes('preview.redd.it')) {
-                // Check if direct URL is a media file
-                if (/\.(jpg|jpeg|png|gif|webp|mp4|webm)$/i.test(post.url)) {
-                    return post.url;
-                }
+            if (previewUrl.startsWith('http')) {
+                console.log('getMediaUrl: Using preview.images[0].source.url:', previewUrl);
+                return previewUrl;
             }
-            return previewUrl;
         }
-
+        
         // Direct URL as fallback
-        return post.url || '';
+        if (post.url) {
+            console.log('getMediaUrl: Using post.url as fallback:', post.url);
+            return post.url;
+        }
+        
+        // No usable URL found
+        console.warn('getMediaUrl: No usable media URL found for post:', post.id);
+        return null;
     }
 
     getMediaType(post) {
