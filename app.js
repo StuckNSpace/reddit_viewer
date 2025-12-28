@@ -36,45 +36,10 @@ class RedditViewer {
         });
 
         // Load on Enter key
-        const subredditsInput = document.getElementById('subreddits');
-        subredditsInput.addEventListener('keypress', (e) => {
+        document.getElementById('subreddits').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.loadContent();
             }
-        });
-
-        // Android TV: Force focus and show keyboard on input focus
-        subredditsInput.addEventListener('focus', () => {
-            // Try to trigger virtual keyboard
-            subredditsInput.click();
-            // Show virtual keyboard as fallback
-            this.showVirtualKeyboard();
-        });
-
-        // Virtual keyboard controls
-        document.getElementById('showKeyboardBtn').addEventListener('click', () => {
-            this.showVirtualKeyboard();
-            subredditsInput.focus();
-        });
-
-        document.getElementById('closeKeyboardBtn').addEventListener('click', () => {
-            this.hideVirtualKeyboard();
-        });
-
-        // Setup virtual keyboard keys
-        document.querySelectorAll('.key').forEach(key => {
-            key.addEventListener('click', () => {
-                const keyValue = key.dataset.key;
-                if (keyValue === 'backspace') {
-                    const current = subredditsInput.value;
-                    subredditsInput.value = current.slice(0, -1);
-                } else if (keyValue === 'clear') {
-                    subredditsInput.value = '';
-                } else {
-                    subredditsInput.value += keyValue;
-                }
-                subredditsInput.focus();
-            });
         });
 
         // Mix/Shuffle button
@@ -82,16 +47,6 @@ class RedditViewer {
         
         // Auto-Play Mode button
         document.getElementById('autoPlayBtn').addEventListener('click', () => this.startAutoPlayMode());
-    }
-
-    showVirtualKeyboard() {
-        const keyboard = document.getElementById('virtualKeyboard');
-        keyboard.classList.remove('hidden');
-    }
-
-    hideVirtualKeyboard() {
-        const keyboard = document.getElementById('virtualKeyboard');
-        keyboard.classList.add('hidden');
     }
 
     initializeViewer() {
@@ -160,6 +115,7 @@ class RedditViewer {
     async fetchPosts() {
         try {
             const allPosts = [];
+            const errors = [];
             
             // Fetch from all subreddits in parallel
             const promises = this.currentSubreddits.map(subreddit => 
@@ -170,42 +126,86 @@ class RedditViewer {
             
             results.forEach((result, index) => {
                 if (result.status === 'fulfilled') {
-                    allPosts.push(...result.value);
+                    if (result.value && result.value.length > 0) {
+                        allPosts.push(...result.value);
+                    } else {
+                        errors.push(`r/${this.currentSubreddits[index]} returned no posts`);
+                    }
                 } else {
+                    const errorMsg = `r/${this.currentSubreddits[index]}: ${result.reason?.message || result.reason}`;
+                    errors.push(errorMsg);
                     console.error(`Failed to fetch ${this.currentSubreddits[index]}:`, result.reason);
                 }
             });
 
+            // Show errors if any, but continue if we have some posts
+            if (errors.length > 0 && allPosts.length === 0) {
+                this.showError(`Failed to load content: ${errors.join(', ')}`);
+            } else if (errors.length > 0) {
+                console.warn('Some subreddits failed to load:', errors);
+                // Still show content if we got some posts
+            }
+
+            if (allPosts.length === 0) {
+                this.showError('No content found. Please check subreddit names and try again.');
+                return;
+            }
+
             // Sort by score (upvotes) descending
-            allPosts.sort((a, b) => b.score - a.score);
+            allPosts.sort((a, b) => (b.score || 0) - (a.score || 0));
             
             this.posts = [...this.posts, ...allPosts];
             this.filterAndDisplay();
             
         } catch (error) {
             console.error('Error fetching posts:', error);
-            this.showError('Failed to load content. Please try again.');
+            this.showError(`Failed to load content: ${error.message || 'Unknown error'}. Please check your internet connection and try again.`);
         } finally {
             this.showLoading(false);
         }
     }
 
     async fetchSubredditPosts(subreddit) {
-        const url = `https://www.reddit.com/r/${subreddit}/hot.json?limit=25${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        try {
+            // Clean subreddit name (remove r/ if present)
+            const cleanSubreddit = subreddit.replace(/^r\//, '').trim();
+            const url = `https://www.reddit.com/r/${encodeURIComponent(cleanSubreddit)}/hot.json?limit=25${this.currentAfter ? `&after=${this.currentAfter}` : ''}`;
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                // Add credentials for better compatibility
+                mode: 'cors',
+                cache: 'no-cache'
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`Reddit API error for r/${cleanSubreddit}:`, response.status, errorText);
+                throw new Error(`Failed to load r/${cleanSubreddit}: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            // Validate response structure
+            if (!data || !data.data || !data.data.children) {
+                console.error('Invalid Reddit API response:', data);
+                throw new Error(`Invalid response from r/${cleanSubreddit}`);
+            }
+            
+            if (this.currentAfter === null) {
+                // Only update after token on first load
+                this.currentAfter = data.data.after;
+            }
+            
+            return data.data.children.map(child => child.data);
+        } catch (error) {
+            console.error(`Error fetching r/${subreddit}:`, error);
+            // Return empty array instead of throwing to allow other subreddits to load
+            return [];
         }
-        
-        const data = await response.json();
-        
-        if (this.currentAfter === null) {
-            // Only update after token on first load
-            this.currentAfter = data.data.after;
-        }
-        
-        return data.data.children.map(child => child.data);
     }
 
     filterAndDisplay() {
