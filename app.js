@@ -318,25 +318,25 @@ class RedditViewer {
                         continue; // Try next proxy
                     }
                     
-                    // Check if response is JSON
-                    const contentType = response.headers.get('content-type') || '';
-                    if (!contentType.includes('application/json') && !contentType.includes('text/plain')) {
-                        // Might be HTML error page, try next proxy
-                        const text = await response.text();
-                        if (text.trim().startsWith('<')) {
-                            continue; // HTML response, try next proxy
-                        }
-                        // Try to parse anyway
-                        try {
-                            data = JSON.parse(text);
-                        } catch {
-                            continue;
-                        }
-                    } else {
-                        // Try to parse as JSON
-                        const responseData = await response.json();
-                        data = proxy.parser(responseData);
+                    // Get response as text first to check if it's HTML
+                    const responseText = await response.text();
+                    
+                    // Check if it's HTML error page
+                    if (responseText.trim().startsWith('<')) {
+                        continue; // HTML response, try next proxy
                     }
+                    
+                    // Try to parse as JSON
+                    let responseData;
+                    try {
+                        responseData = JSON.parse(responseText);
+                    } catch (parseError) {
+                        // Not valid JSON, try next proxy
+                        continue;
+                    }
+                    
+                    // Parse using proxy-specific parser
+                    data = proxy.parser(responseData);
                     
                     // Validate it's Reddit data structure
                     if (data && data.data && data.data.children) {
